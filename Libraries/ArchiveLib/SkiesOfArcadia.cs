@@ -1130,15 +1130,15 @@ namespace ArchiveLib
 			// 0x0C	- Float; Z Pos 0,0
 			// 0x10	- Short; X quad Number
 			// 0x12	- Short; Z quad Number
-			// 0x14	- Short; X quad Length
-			// 0x16 - Short; Z quad Length
+			// 0x14	- Short; X quad Length		Appears to be 40 for A002A.MLD
+			// 0x16 - Short; Z quad Length		Appears to be 40 for A002A.MLD
 			// 0x18	- Short; Triangle Count
 			// 0x1A	- Short; Poly Count
 
 			/*
 			 * GRND blocks contain a quad tree for quick lookup and collision detection
 			 * It is made up of two chunks, a chunk for the quad tree, and a chunk for the polygons present in the GRND
-			 * The each polygon in the polygon chunk is made up of a compressed list of triangle info, and a compressed list of vertices
+			 * Then each polygon in the polygon chunk is made up of a compressed list of triangle info, and a compressed list of vertices
 			 * Since the polygon chunk uses compression to overlap triangle info and vertices, and the triangle indices which define all
 			 * of the triangles are not listed, this algorithm uses the quad tree chunk to first identify all used triangle info (indices into the 
 			 * triangle info block)
@@ -1251,8 +1251,8 @@ namespace ArchiveLib
 
 			public GOBJ(byte[] file, int address)
 			{                   
-				int addr = 16;
-				GroundObject = get_GOBJ_node(file, addr);
+				//int addr = 16;
+				//GroundObject = get_GOBJ_node(file, addr);
 			}
 
 			private NJS_OBJECT get_GOBJ_node(byte[] file, int address)
