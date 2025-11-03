@@ -1484,7 +1484,7 @@ namespace ArchiveLib
 				
 				if (address != 0)
 				{
-					Objects.Add(new nmldObject(file, address, GetNameAndIndex(i)));
+					ObjectAddresses.Add(address);
 				}
 			}
 		}
@@ -1493,24 +1493,14 @@ namespace ArchiveLib
 		{
 			int count = ByteConverter.ToInt32(file, offset);
 
-			List<int> addrs = new List<int>();
-
 			for (int i = 0; i < count; i++)
 			{
 				int address = ByteConverter.ToInt32(file, offset + (4 * (i + 1)));
 
 				if (address != 0)
 				{
-					if (!addrs.Contains(address))
-						addrs.Add(address);
-				}
+					MotionAddresses.Add(address);
 			}
-
-			int idx = 0;
-			foreach (int addr in addrs)
-			{
-				Motions.Add(new nmldMotion(file, addr, GetNameWithIndex(), idx.ToString()));
-				idx++;
 			}
 		}
 
@@ -1524,7 +1514,7 @@ namespace ArchiveLib
 
 				if (address != 0)
 				{
-					Grounds.Add(new nmldGround(file, address, GetNameAndIndex(i)));
+					GroundAddresses.Add(address);
 				}
 			}
 		}
