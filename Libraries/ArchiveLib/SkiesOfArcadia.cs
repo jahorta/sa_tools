@@ -1285,7 +1285,7 @@ namespace ArchiveLib
 			File = new byte[filesize];
 			Array.Copy(file, address, File, 0, filesize);
 
-			Name = name;
+			Name = name + "_" + magic;
 
 			switch (magic)
 			{
@@ -1310,12 +1310,35 @@ namespace ArchiveLib
 			{
 				ConvertedObject = GRNDObj.ToObject();
 			}
-			/*
-			if (Type == GroundType.GroundObject)
+			//if (Type == GroundType.GroundObject)
+			//{
+			//	ConvertedObject = GOBJChunk.;
+			//}
+		}
+
+		static public nmldGround FromGrndFile(byte[] file, string name, bool use_a_star, bool use_legacy_anchor_packing)
 			{
-				ConvertedObject = GOBJChunk.GroundObject;
+			nmldGround grnd = new nmldGround();
+
+			grnd.Name = name;
+			if (name.Contains("GOBJ"))
+			{ 
+				grnd.File = file;
+				grnd.Type = GroundType.GroundObject;
+				return grnd;
+			} else if (name.Contains("GUNK"))
+			{
+				grnd.File = file;
+				grnd.Type = GroundType.Unknown;
+				return grnd;
 			}
-			*/
+
+			grnd.Type = GroundType.Ground;
+			ModelFile obj = new ModelFile(file, name);
+			grnd.GRNDObj = new GRND(obj, name);
+			grnd.File = grnd.GRNDObj.GetBytes(use_a_star, use_legacy_anchor_packing);
+
+			return grnd;
 		}
 	}
 
