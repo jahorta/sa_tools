@@ -1769,6 +1769,25 @@ namespace ArchiveLib
 			return entry;
 	}
 
+		public byte[] GetBytes()
+		{
+			byte[] entry = new byte[0x68];
+			ByteConverter.GetBytes(Index).CopyTo(entry, 0);
+			ByteConverter.GetBytes(TblID).CopyTo(entry, 4);
+
+			// Leave space for lists
+
+			byte[] fxnBytes = Encoding.ASCII.GetBytes(Fxn);
+			int len = Math.Min(fxnBytes.Length, 0x10);
+			Array.Copy(fxnBytes, 0, entry, 0x24, len);
+
+			Position.GetBytes().CopyTo(entry, 0x44);
+			Rotation.GetBytes().CopyTo(entry, 0x50);
+			Scale.GetBytes().CopyTo(entry, 0x5c);
+			return entry;
+		}
+	}
+
 	public class nmldArchiveFile
 	{
 		public string Name { get; set; } = string.Empty;
