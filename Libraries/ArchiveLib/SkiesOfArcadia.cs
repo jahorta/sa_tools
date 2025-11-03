@@ -1748,6 +1748,25 @@ namespace ArchiveLib
 			if (value.Length == 0) return [];
 			return value.Split(',').ToList();
 		}
+
+		internal static nmldEntry FromManifest(string key, IniGroup entry_ini)
+		{
+			nmldEntry entry = new();
+			entry.Index = int.Parse(key);
+			entry.TblID = int.Parse(entry_ini["TblID"], System.Globalization.NumberStyles.HexNumber);
+			if (entry_ini.ContainsKey("GroundLinks")) entry.GroundLinks = IntListFromManifestValue(entry_ini["GroundLinks"]);
+			if (entry_ini.ContainsKey("ParamList2")) entry.ParamList2 = IntListFromManifestValue(entry_ini["ParamList2"]);
+			if (entry_ini.ContainsKey("FunctionParameters")) entry.FunctionParameters = IntListFromManifestValue(entry_ini["FunctionParameters"]);
+			if (entry_ini.ContainsKey("NJs")) entry.ObjectFilenames = StringListFromManifestValue(entry_ini["NJs"]);
+			if (entry_ini.ContainsKey("Motions")) entry.MotionFilenames = StringListFromManifestValue(entry_ini["Motions"]);
+			if (entry_ini.ContainsKey("Grnds")) entry.GroundFilenames = StringListFromManifestValue(entry_ini["Grnds"]);
+			if (entry_ini.ContainsKey("Textures")) entry.TexFilenames = StringListFromManifestValue(entry_ini["Textures"]);
+			entry.Fxn = entry_ini["Fxn"];
+			entry.Position = new Vertex(entry_ini["Position"]);
+			entry.Rotation = new Vertex(entry_ini["Rotation"]);
+			entry.Scale = new Vertex(entry_ini["Scale"]);
+
+			return entry;
 	}
 
 	public class nmldArchiveFile
