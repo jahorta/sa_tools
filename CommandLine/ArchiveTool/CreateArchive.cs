@@ -12,6 +12,7 @@ using static ArchiveLib.ARCXFile;
 using static ArchiveLib.MLTFile;
 using static ArchiveLib.gcaxMLTFile;
 using static ArchiveLib.AFSFile;
+using System.ComponentModel;
 
 namespace ArchiveTool
 {
@@ -32,14 +33,42 @@ namespace ArchiveTool
             File.WriteAllBytes(Path.ChangeExtension(filePath, ".prs"), bindata);
             Console.WriteLine("PRS archive was compiled successfully!");
         }
-        /// <summary>
-        /// Main function for automatic archive building from a folder.
-        /// </summary>
-        static void BuildFromFolder(string[] args)
+
+		/// <summary>
+		/// Pack an MLD archive using a manifest file.
+		/// </summary>
+		static void PackMLD(string[] args)
+		{
+			filePath = args[1];
+			if (Path.GetExtension(filePath) != ".mldman") 
+			{
+				Console.WriteLine("This is not a manifest file (*.mldman): {0}", filePath);
+				return;
+			}
+			else if (!Path.Exists(filePath))
+			{
+				Console.WriteLine("Unable to find manifest file: {0}", filePath);
+				return;
+			}
+			bool use_a_star = false;
+			bool use_legacy_packing = false;
+			for (int a = 0; a < args.Length; a++)
+			{
+				if (args[a] == "-astar") use_a_star = true;
+				if (args[a] == "-legacy") use_legacy_packing = true;
+			}
+			CreateMLD(filePath, use_a_star, use_legacy_packing);
+		}
+
+		/// <summary>
+		/// Main function for automatic archive building from a folder.
+		/// </summary>
+		static void BuildFromFolder(string[] args)
         {
             bool createPB = false;
 			bool createARCX = false;
 			bool createAFS = false;
+			bool createMLD = false;
 			int afsblock = 0x80000;
 			AFSMetaMode afsmetamode = AFSMetaMode.OffsetEndTable;
             filePath = args[0];
@@ -62,6 +91,11 @@ namespace ArchiveTool
 				if (createARCX)
 				{
 					CreateARCX(filePath);
+					return;
+				}
+				if (createMLD)
+				{
+					//if 
 					return;
 				}
                 if (!File.Exists(indexfilename))
@@ -271,6 +305,21 @@ namespace ArchiveTool
             pak.Save(Path.ChangeExtension(outputPath, "pak"));
             Console.WriteLine("Done!");
         }
+
+		/// <summary>
+		/// Create an MLD archive from a manifest file.
+		/// </summary>
+		static void CreateMLD(string manifestPath, bool use_a_star, bool use_legacy_packing)
+		{
+			outputPath = Directory.GetParent(manifestPath).FullName;
+			Console.WriteLine("Building {0}", Path.GetFullPath(manifestPath));
+			nmldArchiveFile mld = nmldArchiveFile.BuildFromManifest(Directory.GetParent(manifestPath).FullName, manifestPath, use_a_star, use_legacy_packing);
+			byte[] data = mld.GetBytes();
+			string fileName = mld.Name + ".MLD";
+			Console.WriteLine("Output file: {0}", Path.Combine(outputPath, fileName));
+			File.WriteAllBytes(Path.Combine(outputPath, fileName), data);
+		}
+
 		/// <summary>
 		/// Create an ARCX archive from a folder.
 		/// </summary>
