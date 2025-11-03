@@ -1428,10 +1428,17 @@ namespace ArchiveLib
 		public List<int> GroundLinks { get; set; } = new();
 		public List<int> ParamList2 { get; set; } = new();
 		public List<int> FunctionParameters { get; set; } = new();
-		public List<nmldObject> Objects { get; set; } = new();
-		public List<nmldMotion> Motions { get; set; } = new();
-		public List<nmldGround> Grounds { get; set; } = new();
+
+		public List<int> ObjectAddresses { get; set; } = new();
+		public List<int> MotionAddresses { get; set; } = new();
+		public List<int> GroundAddresses { get; set; } = new();
 		public nmldTextureList Texlist { get; set; } = new();
+
+		public List<string> ObjectFilenames { get; set; } = new();
+		public List<string> MotionFilenames { get; set; } = new();
+		public List<string> GroundFilenames { get; set; } = new();
+		public List<string> TexFilenames { get; set; } = new();
+
 		public string Fxn { get; set; } = string.Empty;
 		public Vertex Position { get; set; } = new();
 		public Vertex Rotation { get; set; } = new();
