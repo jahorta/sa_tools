@@ -1793,6 +1793,12 @@ namespace ArchiveLib
 		public string Name { get; set; } = string.Empty;
 		public string Label { get; set; } = string.Empty;
 		public List<nmldEntry> Entries { get; set; } = new();
+		public HashSet<int> ObjectAddresses = new();
+		public Dictionary<int, nmldObject> Objects { get; set; } = new();
+		public HashSet<int> MotionAddresses = new();
+		public Dictionary<int, nmldMotion> Motions { get; set; } = new();
+		public HashSet<int> GroundAddresses = new();
+		public Dictionary<int, nmldGround> Grounds { get; set; } = new();
 		public PuyoFile TextureFile { get; set; }
 
 		private void GetTextureArchive(byte[] file, int offset)
@@ -1872,7 +1878,89 @@ namespace ArchiveLib
 		{
 			for (int i = 0; i < count; i++)
 			{
-				Entries.Add(new nmldEntry(offset + (i * 104), file));
+				nmldEntry entry = new nmldEntry(offset + (i * 104), file);
+				if (entry.ObjectAddresses.Count > 0)
+				{
+					foreach (int addr in entry.ObjectAddresses)
+					{
+						ObjectAddresses.Add(addr);
+			}
+		}
+				if (entry.MotionAddresses.Count > 0)
+				{
+					foreach (int addr in entry.MotionAddresses)
+					{
+						MotionAddresses.Add(addr);
+					}
+				}
+				if (entry.GroundAddresses.Count > 0)
+				{
+					foreach (int addr in entry.GroundAddresses)
+					{
+						GroundAddresses.Add(addr);
+					}
+				}
+				Entries.Add(entry);
+			}
+		}
+
+		private void GetNmldPieces(byte[] file)
+		{
+			string base_name = Name;
+			int count = 0;
+			foreach (int offset in ObjectAddresses)
+			{
+				string filename = base_name + "_NJ_" + count.ToString("D3");
+				count++;
+				Objects.Add(offset, new nmldObject(file, offset, filename));
+			}
+			foreach (int offset in MotionAddresses)
+			{
+				Motions.Add(offset, new nmldMotion(file, offset, base_name, count.ToString("D3")));
+				count++;
+			}
+			foreach (int offset in GroundAddresses)
+			{
+				string filename = base_name + "_" + count.ToString("D3");
+				count++;
+				Grounds.Add(offset, new nmldGround(file, offset, filename));
+			}
+		}
+
+		private void LinkEntriesToNmldPieces()
+		{
+			foreach (nmldEntry entry in Entries)
+			{
+				if (entry.ObjectAddresses.Count > 0)
+				{
+					foreach (int addr in entry.ObjectAddresses)
+					{
+						if (Objects.TryGetValue(addr, out nmldObject obj))
+						{ 
+							entry.ObjectFilenames.Add(obj.Name); 
+						}
+					}
+				}
+				if (entry.MotionAddresses.Count > 0)
+				{
+					foreach (int addr in entry.MotionAddresses)
+					{
+						if (Motions.TryGetValue(addr, out nmldMotion obj))
+						{
+							entry.MotionFilenames.Add(obj.Name);
+						}
+					}
+				}
+				if (entry.GroundAddresses.Count > 0)
+				{
+					foreach (int addr in entry.GroundAddresses)
+					{
+						if (Grounds.TryGetValue(addr, out nmldGround obj))
+						{
+							entry.GroundFilenames.Add(obj.Name);
+						}
+					}
+				}
 			}
 		}
 
@@ -1904,6 +1992,12 @@ namespace ArchiveLib
 
 			// Collect Entries and their contents
 			GetEntries(file, ptr_nmldTable, nmldCount);
+
+			// Collect nMLD components
+			GetNmldPieces(file);
+
+			// Provide filenames for components
+			LinkEntriesToNmldPieces();
 		}
 	}
 
