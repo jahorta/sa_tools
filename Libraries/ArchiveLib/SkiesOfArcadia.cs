@@ -1801,6 +1801,9 @@ namespace ArchiveLib
 		public Dictionary<int, nmldGround> Grounds { get; set; } = new();
 		public PuyoFile TextureFile { get; set; }
 
+		public bool UseAStar { get; set; } = false;
+		public bool UseLegacyAnchorPacking { get; set; } = false;
+
 		private void GetTextureArchive(byte[] file, int offset)
 		{
 			Console.WriteLine("Getting Textures...");
@@ -1998,6 +2001,566 @@ namespace ArchiveLib
 
 			// Provide filenames for components
 			LinkEntriesToNmldPieces();
+		}
+
+		public static nmldArchiveFile BuildFromManifest(string directoryPath,string manifestPath, bool use_a_star, bool use_legacy_packing)
+		{
+			nmldArchiveFile nmldFile = new nmldArchiveFile();
+			nmldFile.UseAStar = use_a_star;
+			nmldFile.UseLegacyAnchorPacking = use_legacy_packing;
+
+			nmldFile.Name = Path.GetFileNameWithoutExtension(manifestPath);
+
+			IniDictionary manifest = IniFile.Load(manifestPath);
+
+			if (!manifest.TryGetValue("Details", out IniGroup defs) || !defs.TryGetValue("endian", out string endian))
+			{
+				Console.WriteLine("Unable to determine endianness of file. Please add a Default section with the endian setting. Skipping..");
+				return nmldFile;
+			}
+
+			PuyoFile texFile = new PuyoFile();
+			if (defs.TryGetValue("TextureFile", out string texFilename))
+			{
+				string[] texFilePaths = Directory.GetFiles(directoryPath, texFilename, SearchOption.AllDirectories);
+				if (texFilePaths.Length != 1)
+				{
+					if (texFilePaths.Length == 0) Console.WriteLine("No Texture archive found for {0}", texFilename);
+					else Console.WriteLine("Multiple files ({0}) found with same name: {1}", texFilePaths.Length, texFilename);
+				}
+				else
+				{
+					Console.WriteLine("Found texture file: {0}", texFilename);
+					byte[] texFileBytes = File.ReadAllBytes(texFilePaths[0]);
+					nmldFile.TextureFile = new PuyoFile(texFileBytes);
+					for (int j = 0; j < nmldFile.TextureFile.Entries.Count; j++)
+					{
+						nmldFile.TextureFile.Entries[j].Name = Path.GetFileNameWithoutExtension(nmldFile.TextureFile.Entries[j].Name);
+					}
+				}
+			}
+
+			if (defs.TryGetValue("Label", out string label))
+			{
+				nmldFile.Label = label;
+				Console.WriteLine("Label found for mld file: {0}", label);
+			}
+
+			manifest.Remove("Details");
+
+			bool isBigEndian = endian == "big" ? true : false;
+			ByteConverter.BigEndian = isBigEndian;
+
+			List<string> objectFilenames = new List<string>();
+			List<string> groundFilenames = new List<string>();
+			List<string> motionFilenames = new List<string>();
+			List<string> textureFilenames = new List<string>();
+
+			// Decode each entry and make a list of unique "filenames" for later
+			foreach (string key in manifest.Keys)
+			{
+				if (key.Length == 0) continue;
+				IniGroup ini = manifest[key];
+				nmldEntry entry = nmldEntry.FromManifest(key, ini);
+
+				foreach (string filename in entry.ObjectFilenames)
+				{
+					if (!objectFilenames.Contains(filename)) objectFilenames.Add(filename);
+				}
+				foreach (string filename in entry.GroundFilenames)
+				{
+					if (!groundFilenames.Contains(filename)) groundFilenames.Add(filename);
+				}
+				foreach (string filename in entry.MotionFilenames)
+				{
+					if (!motionFilenames.Contains(filename)) motionFilenames.Add(filename);
+				}
+				foreach (string filename in entry.TexFilenames)
+				{
+					if (!textureFilenames.Contains(filename)) textureFilenames.Add(filename);
+				}
+
+				nmldFile.Entries.Add(entry);
+			}
+
+			nmldFile.Entries.Sort(Comparer<nmldEntry>.Create((a, b) => { return a.Index.CompareTo(b.Index); }));
+
+			bool file_load_err = false;
+
+			// check that all textures are present
+			// attempt to find texture files that are absent
+			Dictionary<string, PVMEntry> pvm_entries = new();
+			Dictionary<string, GVMEntry> gvm_entries = new();
+
+			foreach (string filename in textureFilenames)
+			{
+				if (isBigEndian)
+				{ 
+					GVMEntry found = (GVMEntry)nmldFile.TextureFile.Entries.FirstOrDefault(item => item.Name == filename);
+					if (found != null)
+					{
+						Console.WriteLine("Found texture file in archive: {0}", filename);
+						continue;
+					}
+					string[] texFilePaths = Directory.GetFiles(directoryPath, filename + ".gvr", SearchOption.AllDirectories);
+					if (texFilePaths.Length != 1)
+					{
+						if (texFilePaths.Length == 0) Console.WriteLine("No Texture file found for {0}", filename);
+						else Console.WriteLine("Multiple files ({0}) found with same name: {1}", texFilePaths.Length, filename);
+						file_load_err = true;
+					}
+					else
+					{
+						Console.WriteLine("Found texture file: {0} - Adding to texture archive", filename);
+						byte[] texFileBytes = File.ReadAllBytes(texFilePaths[0]);
+						nmldFile.TextureFile.Entries.Add(new GVMEntry(texFileBytes, filename));
+					}
+				}
+				else 
+				{ 
+					PVMEntry found = (PVMEntry)nmldFile.TextureFile.Entries.FirstOrDefault(item => item.Name == filename);
+					if (found != null)
+					{
+						Console.WriteLine("Found texture file in archive: {0}", filename);
+						pvm_entries.Add(filename, found);
+						continue; 
+					}
+					string[] texFilePaths = Directory.GetFiles(directoryPath, filename + ".pvr", SearchOption.AllDirectories);
+					if (texFilePaths.Length != 1)
+					{
+						if (texFilePaths.Length == 0) Console.WriteLine("No Texture file found for {0}", filename);
+						else Console.WriteLine("Multiple files ({0}) found with same name: {1}", texFilePaths.Length, filename);
+						file_load_err = true;
+					}
+					else
+					{
+						Console.WriteLine("Found texture file: {0} - Adding to texture archive", filename);
+						byte[] texFileBytes = File.ReadAllBytes(texFilePaths[0]);
+						nmldFile.TextureFile.Entries.Add(new PVMEntry(texFileBytes, filename));
+					}
+				}
+			}
+
+			// attempt to find and encode all object files that are requested
+			int i = 0;
+			foreach (string filename in objectFilenames)
+			{
+				string[] texFilePaths = Directory.GetFiles(directoryPath, filename + ".nj", SearchOption.AllDirectories);
+				if (texFilePaths.Length != 1)
+				{
+					if (texFilePaths.Length == 0) Console.WriteLine("No Ninja file found for {0}.nj", filename);
+					else Console.WriteLine("Multiple files ({0}) found with same name: {1}.nj", texFilePaths.Length, filename);
+					file_load_err = true;
+				}
+				else
+				{
+					Console.WriteLine("Found ninja file: {0}", Path.GetFileName(texFilePaths[0]));
+					byte[] texFileBytes = File.ReadAllBytes(texFilePaths[0]);
+					nmldFile.Objects.Add(i, new nmldObject(texFileBytes, filename));
+					foreach (nmldEntry entry in nmldFile.Entries) 
+					{
+						if (entry.ObjectFilenames.Contains(filename))
+						{
+							entry.ObjectAddresses.Add(i);
+						}
+					}
+				}
+				i++;
+			}
+
+			foreach (string filename in groundFilenames)
+			{
+				string[] grndFilePaths = Directory.GetFiles(directoryPath, filename + ".*", SearchOption.AllDirectories);
+				if (grndFilePaths.Length != 1)
+				{
+					if (grndFilePaths.Length == 0) Console.WriteLine("No GRND file found for {0}.*", filename);
+					else Console.WriteLine("Multiple files ({0}) found with same name: {1}.*", grndFilePaths.Length, filename);
+					file_load_err = true;
+				}
+				else
+				{
+					Console.WriteLine("Found ninja file: {0} ", Path.GetFileName(grndFilePaths[0]));
+					byte[] grndFileBytes = File.ReadAllBytes(grndFilePaths[0]);
+					nmldFile.Grounds.Add(i, nmldGround.FromGrndFile(grndFileBytes, filename, nmldFile.UseAStar, nmldFile.UseLegacyAnchorPacking));
+					foreach (nmldEntry entry in nmldFile.Entries)
+					{
+						if (entry.GroundFilenames.Contains(filename))
+						{
+							entry.GroundAddresses.Add(i);
+						}
+					}
+				}
+				i++;
+			}
+
+			foreach (string filename in motionFilenames)
+			{
+				string[] motionFilePaths = Directory.GetFiles(directoryPath, filename + ".*", SearchOption.AllDirectories);
+				if (motionFilePaths.Length != 1)
+				{
+					if (motionFilePaths.Length == 0) Console.WriteLine("No motion file found for {0}.*", filename);
+					else Console.WriteLine("Multiple files ({0}) found with same name: {1}.*", motionFilePaths.Length, filename);
+					file_load_err = true;
+				}
+				else
+				{
+					Console.WriteLine("Found motion file: {0}", Path.GetFileName(motionFilePaths[0]));
+					byte[] motionFileBytes = File.ReadAllBytes(motionFilePaths[0]);
+					nmldFile.Motions.Add(i, new nmldMotion(motionFileBytes, 0, filename, "0"));
+					foreach (nmldEntry entry in nmldFile.Entries)
+					{
+						if (entry.MotionFilenames.Contains(filename))
+						{
+							entry.MotionAddresses.Add(i);
+						}
+					}
+				}
+				i++;
+			}
+
+			if (file_load_err) Console.WriteLine("**** Some files were not loaded correctly, so some MLD entries may fail. ****");
+
+			return nmldFile;
+		}
+
+		public byte[] GetBytes()
+		{
+
+			// Build Texture block
+
+			int texIndexSize = 4 + (TextureFile.Entries.Count * 44);
+
+			// If alignment matters, add more space to get to a multiple of 0x10
+
+			byte[] texIndex = new byte[texIndexSize];
+
+			ByteConverter.GetBytes(TextureFile.Entries.Count).CopyTo(texIndex, 0);
+
+			int texDataSize = 0;
+			for (int i = 0; i < TextureFile.Entries.Count; i++)
+			{
+				GenericArchive.GenericArchiveEntry entry = TextureFile.Entries[i];
+				Encoding.ASCII.GetBytes(entry.Name).CopyTo(texIndex, 4 + (44 * i));
+				int size = 0;
+				if (ByteConverter.BigEndian) { GVMEntry e = (GVMEntry)entry; size = e.Data.Length; }
+				else { PVMEntry e = (PVMEntry)entry; size = e.Data.Length; }
+				texDataSize += size;
+				ByteConverter.GetBytes(size).CopyTo(texIndex, 4 + (44 * i) + 40);
+			}
+
+			// Build Texture Data block
+
+			int texDataPtr = 0;
+			byte[] texData = new byte[texDataSize];
+			for (int i = 0; i < TextureFile.Entries.Count; i++)
+			{
+				if (ByteConverter.BigEndian) 
+				{
+					GVMEntry e = (GVMEntry)TextureFile.Entries[i];
+					e.Data.CopyTo(texData, texDataPtr);
+					texDataPtr += e.Data.Length;
+				}
+				else 
+				{ 
+					PVMEntry e = (PVMEntry)TextureFile.Entries[i];
+					e.Data.CopyTo(texData, texDataPtr);
+					texDataPtr += e.Data.Length;
+				}
+			}
+
+			int texBlockSize = texIndexSize + texDataSize;
+
+			// Build Data Section
+			// Determine order of data segments
+
+			HashSet<int> seenAddrs = new();
+			int nmldDataSize = 0;
+			List<Tuple<string, int>> dataOrder = new();
+			foreach (nmldEntry entry in Entries)
+			{
+				if (entry.ObjectAddresses.Count > 0)
+				{
+					foreach (int i in entry.ObjectAddresses) 
+					{
+						if (seenAddrs.Contains(i)) continue;
+						seenAddrs.Add(i);
+						dataOrder.Add(new Tuple<string, int>("NJ", i));
+						nmldDataSize += Objects[i].File.Length;
+						nmldDataSize += Objects[i].Header.Length;
+					}
+				}
+				if (entry.GroundAddresses.Count > 0)
+				{
+					foreach (int i in entry.GroundAddresses)
+					{
+						if (seenAddrs.Contains(i)) continue;
+						seenAddrs.Add(i);
+						dataOrder.Add(new Tuple<string, int>("GRND", i));
+						nmldDataSize += Grounds[i].File.Length;
+					}
+				}
+				if (entry.MotionAddresses.Count > 0)
+				{
+					foreach (int i in entry.MotionAddresses)
+					{
+						if (seenAddrs.Contains(i)) continue;
+						seenAddrs.Add(i);
+						dataOrder.Add(new Tuple<string, int>("Motion", i));
+						nmldDataSize += Motions[i].File.Length;
+					}
+				}
+			}
+
+			// align end of data block to 0x10
+			while (nmldDataSize % 0x10 != 0) nmldDataSize++;
+
+			// write data segments to data block
+
+			Dictionary<int, int> dataOffsets = new();
+			int dataOffsetPtr = 0;
+			byte[] nmldData = new byte[nmldDataSize];
+			foreach (Tuple<string,int> entry in dataOrder)
+			{
+				if (dataOffsets.ContainsKey(entry.Item2)) continue;
+
+				dataOffsets.Add(entry.Item2, dataOffsetPtr);
+				switch(entry.Item1)
+				{
+					case "NJ":
+						nmldObject obj = Objects[entry.Item2];
+						obj.Header.CopyTo(nmldData, dataOffsetPtr);
+						dataOffsetPtr += obj.Header.Length;
+						obj.File.CopyTo(nmldData, dataOffsetPtr);
+						dataOffsetPtr += obj.File.Length;
+						break;
+					case "GRND":
+						nmldGround grnd = Grounds[entry.Item2];
+						grnd.File.CopyTo(nmldData, dataOffsetPtr);
+						dataOffsetPtr += grnd.File.Length;
+						break;
+					case "Motion":
+						nmldMotion mot = Motions[entry.Item2];
+						mot.File.CopyTo(nmldData, dataOffsetPtr);
+						dataOffsetPtr += mot.File.Length;
+						break;
+					default:
+						break;
+				}
+			}
+
+			int headerSize = 0x14 + Label.Length;
+
+			// Align headerSize just in case
+			while (headerSize % 0x4 != 0) headerSize++;
+
+			byte[] header = new byte[headerSize];
+			ByteConverter.GetBytes(Entries.Count).CopyTo(header, 0x0);
+			ByteConverter.GetBytes(headerSize).CopyTo(header, 0x4);
+
+			byte[] label = Encoding.ASCII.GetBytes(Label);
+			Array.Copy(label, 0, header, 0x14, label.Length);
+
+			int indexSize = 0x68 * Entries.Count;
+			byte[] indexData = new byte[indexSize];
+
+			int listOffset = headerSize + indexSize;
+			ByteConverter.GetBytes(listOffset).CopyTo(header, 0x8);
+
+			// Build List block
+			int list_offset_ptr = listOffset;
+			List<byte> lists = new();
+			for (int i = 0; i < Entries.Count; i++)
+			{
+				nmldEntry e = Entries[i];
+				int index_offset = 0x68 * i;
+
+				e.GetBytes().CopyTo(indexData, index_offset);
+
+				// Make and register Ground Link List
+				ByteConverter.GetBytes(list_offset_ptr).CopyTo(indexData, index_offset + 0x8);
+
+				lists.AddRange(ByteConverter.GetBytes(e.GroundLinks.Count));
+				list_offset_ptr += 4;
+				foreach (int g in e.GroundLinks)
+				{
+					lists.AddRange(ByteConverter.GetBytes(g));
+					list_offset_ptr += 4;
+				}
+
+				// Make and register Parameter List 2
+				ByteConverter.GetBytes(list_offset_ptr).CopyTo(indexData, index_offset + 0xc);
+
+				lists.AddRange(ByteConverter.GetBytes(e.ParamList2.Count));
+				list_offset_ptr += 4;
+				foreach (int p in e.ParamList2)
+				{
+					lists.AddRange(ByteConverter.GetBytes(p));
+					list_offset_ptr += 4;
+				}
+
+				// Make and register Function Parameter List
+				ByteConverter.GetBytes(list_offset_ptr).CopyTo(indexData, index_offset + 0x10);
+
+				lists.AddRange(ByteConverter.GetBytes(e.FunctionParameters.Count));
+				list_offset_ptr += 4;
+				foreach (int f in e.FunctionParameters)
+				{
+					lists.AddRange(ByteConverter.GetBytes(f));
+					list_offset_ptr += 4;
+				}
+
+				// Make and reserve Object List
+				ByteConverter.GetBytes(list_offset_ptr).CopyTo(indexData, index_offset + 0x14);
+
+				if (e.ObjectAddresses.Count > 0)
+				{
+					lists.AddRange(ByteConverter.GetBytes(e.ObjectAddresses.Count));
+					list_offset_ptr += 4;
+					foreach (int g in e.ObjectAddresses)
+					{
+						lists.AddRange(ByteConverter.GetBytes(e.FunctionParameters.Count));
+						list_offset_ptr += 4;
+					}
+				} else
+				{
+					lists.AddRange(ByteConverter.GetBytes(1));
+					lists.AddRange(ByteConverter.GetBytes(0));
+					list_offset_ptr += 8;
+				}
+
+				// Make and reserve Ground List
+				ByteConverter.GetBytes(list_offset_ptr).CopyTo(indexData, index_offset + 0x18);
+
+				if (e.GroundAddresses.Count > 0)
+				{
+					lists.AddRange(ByteConverter.GetBytes(e.GroundAddresses.Count));
+					list_offset_ptr += 4;
+					foreach (int g in e.GroundAddresses)
+					{
+						lists.AddRange(ByteConverter.GetBytes(g));
+						list_offset_ptr += 4;
+					}
+				}
+				else
+				{
+					lists.AddRange(ByteConverter.GetBytes(1));
+					lists.AddRange(ByteConverter.GetBytes(0));
+					list_offset_ptr += 8;
+				}
+
+				// Make and reserve Motion List
+				ByteConverter.GetBytes(list_offset_ptr).CopyTo(indexData, index_offset + 0x1c);
+
+				if (e.MotionAddresses.Count > 0)
+				{
+					lists.AddRange(ByteConverter.GetBytes(e.MotionAddresses.Count));
+					list_offset_ptr += 4;
+					foreach (int g in e.MotionAddresses)
+					{
+						lists.AddRange(ByteConverter.GetBytes(g));
+						list_offset_ptr += 4;
+					}
+				}
+				else
+				{
+					lists.AddRange(ByteConverter.GetBytes(1));
+					lists.AddRange(ByteConverter.GetBytes(0));
+					list_offset_ptr += 8;
+				}
+
+				// Make and reserve Texture List
+				ByteConverter.GetBytes(list_offset_ptr).CopyTo(indexData, index_offset + 0x20);
+
+				lists.AddRange(ByteConverter.GetBytes(list_offset_ptr + 8));
+				list_offset_ptr += 4;
+
+				lists.AddRange(ByteConverter.GetBytes(e.TexFilenames.Count));
+				list_offset_ptr += 4;
+
+				if (e.TexFilenames.Count > 0)
+				{
+					int texture_name_addr_list_size = 0xC * e.TexFilenames.Count;
+
+					byte[] texture_name_addr_list = new byte[texture_name_addr_list_size];
+					byte[] texture_name_list = new byte[0x20 * e.TexFilenames.Count];
+
+					for (int j = 0; j < e.TexFilenames.Count; j ++)
+					{
+						string name = e.TexFilenames[j];
+						int tex_name_list_offset = 0x20 * j;
+						Encoding.ASCII.GetBytes(name).CopyTo(texture_name_list, tex_name_list_offset);
+
+						int tex_name_list_addr = texture_name_addr_list_size + tex_name_list_offset + list_offset_ptr;
+						int tex_name_addr_list_offset = j * 0xc;
+						ByteConverter.GetBytes(tex_name_list_addr).CopyTo(texture_name_addr_list, tex_name_addr_list_offset);
+	
+					}
+
+					lists.AddRange(texture_name_addr_list);
+					lists.AddRange(texture_name_list);
+
+					list_offset_ptr += texture_name_addr_list.Length;
+					list_offset_ptr += texture_name_list.Length;
+				}
+			}
+			
+			while (lists.Count % 0x20 != 0)
+			{
+				lists.AddRange(Encoding.ASCII.GetBytes("GAP "));
+			}
+
+			byte[] listData = lists.ToArray();
+
+			int nmld_start_ptr = header.Length + indexData.Length + listData.Length;
+
+			// Set nmld data ptr
+			ByteConverter.GetBytes(nmld_start_ptr).CopyTo(header, 0xc);
+
+			// Set texture data ptr
+			ByteConverter.GetBytes(nmld_start_ptr + nmldDataSize).CopyTo(header, 0x10);
+
+			for (int i = 0; i < Entries.Count; i++)
+			{
+				// Set Object pointers
+				int object_list_start_ptr = ByteConverter.ToInt32(indexData, i * 0x68 + 0x14) - listOffset;
+				for (int j = 0; j < Entries[i].ObjectAddresses.Count; j++)
+				{
+					object_list_start_ptr += 4;
+					int object_index = Entries[i].ObjectAddresses[j];
+					int object_ptr = dataOffsets[object_index] + nmld_start_ptr;
+					ByteConverter.GetBytes(object_ptr).CopyTo(listData, object_list_start_ptr);
+				}
+
+				// Set Ground pointers
+				int ground_list_start_ptr = ByteConverter.ToInt32(indexData, i * 0x68 + 0x18) - listOffset;
+				for (int j = 0; j < Entries[i].GroundAddresses.Count; j++)
+				{
+					ground_list_start_ptr += 4;
+					int ground_index = Entries[i].GroundAddresses[j];
+					int ground_ptr = dataOffsets[ground_index] + nmld_start_ptr;
+					ByteConverter.GetBytes(ground_ptr).CopyTo(listData, ground_list_start_ptr);
+				}
+
+				// Set Motion pointers
+				int motion_list_start_ptr = ByteConverter.ToInt32(indexData, i * 0x68 + 0x1C) - listOffset;
+				for (int j = 0; j < Entries[i].MotionAddresses.Count; j++)
+				{
+					motion_list_start_ptr += 4;
+					int motion_index = Entries[i].MotionAddresses[j];
+					int motion_ptr = dataOffsets[motion_index] + nmld_start_ptr;
+					ByteConverter.GetBytes(motion_ptr).CopyTo(listData, motion_list_start_ptr);
+				}
+			}
+
+			List<byte> mldBytes = new();
+			mldBytes.AddRange(header);
+			mldBytes.AddRange(indexData);
+			mldBytes.AddRange(listData);
+			mldBytes.AddRange(nmldData);
+			mldBytes.AddRange(texIndex);
+			mldBytes.AddRange(texData);
+
+			return mldBytes.ToArray();
 		}
 	}
 
