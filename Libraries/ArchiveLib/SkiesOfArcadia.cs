@@ -2586,31 +2586,31 @@ namespace ArchiveLib
 			}
 		}
 
-		private void ExtractEntries(nmldArchiveFile archive, string directory)
+		private void ExtractEntriesNoDup(nmldArchiveFile archive, string directory)
 		{
 			StringBuilder sb = new StringBuilder();
 
-			// Add Entries
-			foreach (nmldEntry entry in archive.Entries)
-			{
 				// Add Objects
-				foreach (nmldObject model in entry.Objects)
+			foreach (KeyValuePair<int, nmldObject> o in archive.Objects)
 				{
+				nmldObject model = o.Value;
 					Entries.Add(new MLDArchiveEntry(model.File, model.Name + ".nj"));
 				}
 
 				// Add Ground/Ground Object Files
-				foreach (nmldGround ground in entry.Grounds)
+			foreach (KeyValuePair<int, nmldGround> g in archive.Grounds)
 				{
+				nmldGround ground = g.Value;
 					ModelFile mfile = new ModelFile(ModelFormat.Basic, ground.ConvertedObject, null, null);
 					switch (ground.Type)
 					{
 						case nmldGround.GroundType.Ground:
-							Entries.Add(new MLDArchiveEntry(mfile.GetBytes(Path.Combine(directory, ground.Name + ".grnd.sa2mdl")), ground.Name + ".grnd.sa2mdl"));
+						Entries.Add(new MLDArchiveEntry(mfile.GetBytes(Path.Combine(directory, ground.Name + "_grnd.sa2mdl")), ground.Name + ".grnd.sa2mdl"));
+						//Entries.Add(new MLDArchiveEntry(ground.File, ground.Name + ".grnd"));
 							// mfile.SaveToFile(Path.Combine(directory, ground.Name + ".grnd.sa2mdl"));
 							break;
 						case nmldGround.GroundType.GroundObject:
-							//Entries.Add(new MLDArchiveEntry(ground.File, ground.Name + ".gobj"));
+						Entries.Add(new MLDArchiveEntry(ground.File, ground.Name + ".gobj"));
 							//mfile.SaveToFile(Path.Combine(directory, ground.Name + ".gobj.sa2mdl"));
 							break;
 						case nmldGround.GroundType.Unknown:
@@ -2620,8 +2620,9 @@ namespace ArchiveLib
 				}
 
 				// Add Motions
-				foreach (nmldMotion motion in entry.Motions)
+			foreach (KeyValuePair<int, nmldMotion> m in archive.Motions)
 				{
+				nmldMotion motion = m.Value;
 					switch (motion.Type)
 					{
 						case nmldMotion.MotionType.Node:
@@ -2635,6 +2636,135 @@ namespace ArchiveLib
 							break;
 						case nmldMotion.MotionType.Unknown:
 							Entries.Add(new MLDArchiveEntry(motion.File, motion.Name + ".num"));
+							break;
+					}
+			}			// Add Texture Archive
+
+			IniDictionary manifest_ini = new IniDictionary();
+
+			IniGroup details = new()
+			{
+				{ "endian", ByteConverter.BigEndian ? "big" : "little" },
+			};
+			
+			if (archive.TextureFile != new PuyoFile())
+			{
+				string ext = "";
+				switch (archive.TextureFile.Type)
+				{
+					case PuyoArchiveType.PVMFile:
+						ext = ".pvm";
+						break;
+					case PuyoArchiveType.GVMFile:
+						ext = ".gvm";
+						break;
+				}
+				Entries.Add(new MLDArchiveEntry(archive.TextureFile.GetBytes(), archive.Name + ext));
+				details.Add("TextureFile", archive.Name + ext);
+			}
+
+			if (archive.Label.Length > 0)
+			{
+				details.Add("Label", archive.Label);
+				}
+
+			manifest_ini.Add("Details", details);
+
+			foreach (nmldEntry entry in archive.Entries)
+			{
+
+				//// Save Texlist
+				//if (entry.Texlist.TexList.NumTextures > 0)
+				//{
+				//	entry.Texlist.TexList.Save(Path.Combine(directory + "_new", entry.Texlist.Name));
+				//}
+
+				manifest_ini.Add(entry.Index.ToString("D3"), entry.GetManifestInfo());
+			}
+
+			StringBuilder manifest = new();
+
+			string[] manifest_strings = IniFile.Save(manifest_ini);
+			for (int i = 0; i < manifest_strings.Count(); i++)
+			{
+				if (i > 0) { manifest.Append(System.Environment.NewLine); }
+				manifest.Append(manifest_strings[i]);
+			}
+
+			// Add Info File
+			Entries.Add(new MLDArchiveEntry(Encoding.ASCII.GetBytes(manifest.ToString()), archive.Name + ".mldman"));
+
+
+		}
+
+		private void ExtractEntries(nmldArchiveFile archive, string directory, bool nodup)
+		{
+			if (nodup)
+			{ 
+				ExtractEntriesNoDup(archive, directory); 
+				return; 
+			}			
+			if (!Directory.Exists(directory))
+				Directory.CreateDirectory(directory);
+
+			StringBuilder sb = new StringBuilder();
+
+			// Add Entries
+			foreach (nmldEntry entry in archive.Entries)
+			{
+				string base_file_name = entry.GetNameWithoutIndex();
+				// Add Objects
+				
+				for (int i = 0; i < entry.ObjectAddresses.Count; i++ )
+				{
+					if (!archive.Objects.TryGetValue(entry.ObjectAddresses[i], out nmldObject obj)) { continue; }
+					Entries.Add(new MLDArchiveEntry(obj.File, base_file_name + "_" + i.ToString("D2") + ".nj"));
+				}
+
+				// Add Ground/Ground Object Files
+				for (int i = 0; i < entry.GroundAddresses.Count; i++)
+				{
+					if (!archive.Grounds.TryGetValue(entry.GroundAddresses[i], out nmldGround ground)) { continue; }
+					ModelFile mfile = new ModelFile(ModelFormat.Basic, ground.ConvertedObject, null, null);
+					string name = base_file_name + i.ToString("D2") + "_";
+					switch (ground.Type)
+					{
+						case nmldGround.GroundType.Ground:
+							Entries.Add(new MLDArchiveEntry(mfile.GetBytes(Path.Combine(directory, name + "_grnd.sa2mdl")), name + "_grnd.sa2mdl"));
+							// mfile.SaveToFile(Path.Combine(directory, ground.Name + "_grnd.sa2mdl"));
+							break;
+						case nmldGround.GroundType.GroundObject:
+							//Entries.Add(new MLDArchiveEntry(ground.File, ground.Name + "_gobj"));
+							//mfile.SaveToFile(Path.Combine(directory, ground.Name + "_gobj.sa2mdl"));
+							break;
+						case nmldGround.GroundType.Unknown:
+							Entries.Add(new MLDArchiveEntry(ground.File, ground.Name + ".gunk"));
+							break;
+					}
+				}
+
+				// Add Motions
+				for (int i = 0; i < entry.MotionAddresses.Count; i++)
+				{
+					if (!archive.Motions.TryGetValue(entry.MotionAddresses[i], out nmldMotion motion)) 
+					{
+						Console.WriteLine("Failed to extract Motion at " + entry.GroundAddresses[i].ToString("X8"));
+						continue; 
+					}
+					string name = base_file_name + motion.GetTypeString() + i.ToString("D2");
+					switch (motion.Type)
+					{
+						case nmldMotion.MotionType.Node:
+							Entries.Add(new MLDArchiveEntry(motion.File, name + ".njm"));
+							break;
+						case nmldMotion.MotionType.Shape:
+							Entries.Add(new MLDArchiveEntry(motion.File, name + ".njs"));
+							break;
+						case nmldMotion.MotionType.Camera:
+							Entries.Add(new MLDArchiveEntry(motion.File, name + ".njc"));
+							break;
+						case nmldMotion.MotionType.Unknown:
+							Entries.Add(new MLDArchiveEntry(motion.File, name + ".num"));
 							break;
 					}
 				}
@@ -2671,7 +2801,7 @@ namespace ArchiveLib
 			}
 		}
 
-		public MLDArchive(string filepath, byte[] file)
+		public MLDArchive(string filepath, byte[] file, bool nodup)
 		{
 			string directory = Path.Combine(Path.GetDirectoryName(filepath), Path.GetFileNameWithoutExtension(filepath));
 			string filename = Path.GetFileNameWithoutExtension(filepath);
@@ -2725,7 +2855,7 @@ namespace ArchiveLib
 
 			if (archive != new nmldArchiveFile())
 			{
-				ExtractEntries(archive, directory);
+				ExtractEntries(archive, directory, nodup);
 			}
 			else
 				Console.WriteLine("Unable to read archive.");
