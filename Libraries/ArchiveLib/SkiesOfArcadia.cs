@@ -1623,9 +1623,36 @@ namespace ArchiveLib
 			Index = ByteConverter.ToInt32(file, offset);
 			TblID = ByteConverter.ToInt32(file, offset + 4);	
 
+			int ptrGroundLinks = ByteConverter.ToInt32(file, offset + 0x8);
+			GetParamList(file, ptrGroundLinks, GroundLinks);
+			int ptrParamList2 = ByteConverter.ToInt32(file, offset + 0xc);
+			GetParamList(file, ptrParamList2, ParamList2);
+			int ptrFunctionParameters = ByteConverter.ToInt32(file, offset + 0x10);
+			GetParamList(file, ptrFunctionParameters, FunctionParameters);
+
+			// Get Entry Objects
+			int ptrObjects = ByteConverter.ToInt32(file, offset + 0x14);
+			if (ByteConverter.ToInt32(file, ptrObjects + 4) != 0)
+				GetObjects(file, ptrObjects);
+
+			// Get Entry Grounds
+			int ptrGrounds = ByteConverter.ToInt32(file, offset + 0x18);
+			if (ByteConverter.ToInt32(file, ptrGrounds + 4) != 0)
+				GetGrounds(file, ptrGrounds);
+
+			// Get Entry Motions
+			int ptrMotions = ByteConverter.ToInt32(file, offset + 0x1C);
+			if (ByteConverter.ToInt32(file, ptrMotions) != 0)
+				GetMotions(file, ptrMotions);
+
+			// Get Entry Textures
+			int ptrTextures = ByteConverter.ToInt32(file, offset + 0x20);
+			if (ByteConverter.ToInt32(file, ptrTextures + 4) != 0)
+				GetTextures(file, ptrTextures);
+
 			// Get Entry Name
 			int namesize = 0;
-			for (int s = 0; s < 32; s++)
+			for (int s = 0; s < 0x14; s++)
 			{
 				if (file[offset + 0x24 + s] != 0)
 					namesize++;
@@ -1636,36 +1663,40 @@ namespace ArchiveLib
 			Array.Copy(file, offset + 0x24, namechunk, 0, namesize);
 			Fxn = Encoding.ASCII.GetString(namechunk);
 
-			int ptrGroundLinks = ByteConverter.ToInt32(file, offset + 0x8);
-			GetParamList(file, ptrGroundLinks, GroundLinks);
-			int ptrParamList2 = ByteConverter.ToInt32(file, offset + 0xc);
-			GetParamList(file, ptrParamList2, ParamList2);
-			int ptrFunctionParameters = ByteConverter.ToInt32(file, offset + 0x10);
-			GetParamList(file, ptrFunctionParameters, FunctionParameters);
+			// 0x38 - 0x43 is reserved for use by the game. A pointer to the data 
 
 			Position	= new Vertex(ByteConverter.ToSingle(file, offset + 0x44), ByteConverter.ToSingle(file, offset + 0x48), ByteConverter.ToSingle(file, offset + 0x4C));
 			Rotation	= new Vertex(ByteConverter.ToSingle(file, offset + 0x50), ByteConverter.ToSingle(file, offset + 0x54), ByteConverter.ToSingle(file, offset + 0x58));
 			Scale		= new Vertex(ByteConverter.ToSingle(file, offset + 0x5C), ByteConverter.ToSingle(file, offset + 0x60), ByteConverter.ToSingle(file, offset + 0x64));
 
-			// Get Entry Objects
-			int ptrObjects = ByteConverter.ToInt32(file, offset + 0x14);
-			if (ByteConverter.ToInt32(file, ptrObjects + 4) != 0)
-				GetObjects(file, ptrObjects);
+		}
 
-			// Get Entry Motions
-			int ptrMotions = ByteConverter.ToInt32(file, offset + 0x1C);
-			if (ByteConverter.ToInt32(file, ptrMotions) != 0)
-				GetMotions(file, ptrMotions);
+		private static string IntListToManifestValue(List<int> list)
+		{
+			StringBuilder gl = new StringBuilder();
+			for (int i = 0; i < list.Count; i++)
+			{
+				if (i > 0) gl.Append(',');
+				gl.Append(list[i].ToString("X8"));
+			}
+			return gl.ToString();
+		}
 
-			// Get Entry Grounds
-			int ptrGrounds = ByteConverter.ToInt32(file, offset + 0x18);
-			if (ByteConverter.ToInt32(file, ptrGrounds + 4) != 0)
-				GetGrounds(file, ptrGrounds);
+		private static List<int> IntListFromManifestValue(string value)
+		{
+			if (value.Length == 0) return [];
+			List<int> list = [];
+			string[] strs = value.Split(',');
+			foreach (string str in strs)
+			{
+				list.Add(int.Parse(str, System.Globalization.NumberStyles.HexNumber));
+			}
+			return list;
+		}
 
-			// Get Entry Textures
-			int ptrTextures = ByteConverter.ToInt32(file, offset + 0x20);
-			if (ByteConverter.ToInt32(file, ptrTextures + 4) != 0)
-				GetTextures(file, ptrTextures);
+		private static string StringListToManifestValue(List<string> list)
+		{
+			return String.Join(',', list);
 		}
 	}
 
