@@ -228,3 +228,4 @@ pip-log.txt
 /buildSATools.exe
 /buildSATools.dll
 /buildSATools.deps.json
+/CommandLine/ArchiveTool/Properties/launchSettings.json
