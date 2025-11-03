@@ -4,6 +4,7 @@ using System.IO;
 using System.Drawing;
 using ArchiveLib;
 using static ArchiveLib.GenericArchive;
+using System.Linq;
 
 namespace ArchiveTool
 {
@@ -86,7 +87,10 @@ namespace ArchiveTool
                     arc = new MDTArchive(arcdata);
                     break;
                 case (".mld"):
-                    arc = new MLDArchive(filePath, arcdata);
+					bool nodup = false;
+					if (args.Count() > 1 && args[1] == "-nodup") { nodup = true; outputPath += "_new"; }
+					if (!Directory.Exists(outputPath)) Directory.CreateDirectory(outputPath);
+                    arc = new MLDArchive(filePath, arcdata, nodup);
                     break;
                 case (".mlt"):
                 case (".gcaxmlt"):

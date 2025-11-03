@@ -26,6 +26,7 @@ namespace ArchiveTool
                 Console.WriteLine("Creating a PRS compressed binary: ArchiveTool -prs <file>\n");
                 Console.WriteLine("Creating an AFS archive: ArchiveTool <file> -afs [-nometa] [-metafirst]\n-nometa: Don't store filenames and timestamps\n-metafirst: Store metadata pointer before the first file entry instead of the end of the entry table.");
 				Console.WriteLine("Extracting contents from Skies of Arcadia (And Legends) MLD Files: ArchiveTool <mldfile>\n\tThe tool will decompress Skies of Arcadia Legends MLD files automatically.");
+				Console.WriteLine("Extracting contents from Skies of Arcadia (And Legends) MLD Files: ArchiveTool <mldfile> [-nodup] \n\tThe tool will decompress Skies of Arcadia Legends MLD files automatically.\n-nodup: remove duplicate mld object files.");
 				Console.WriteLine("Press ENTER to exit.");
                 Console.ReadLine();
                 return;
