@@ -1836,10 +1836,10 @@ namespace ArchiveLib
 				int texdataptr = texdataoffset;
 
 				bool isBig = ByteConverter.BigEndian;
+				ByteConverter.BigEndian = false;
 
 				foreach (KeyValuePair<string, int> tex in texnames)
 				{
-					ByteConverter.BigEndian = false;
 					int texdataptr2 = texdataptr;
 					string magic = Encoding.ASCII.GetString(file, texdataptr2, 4);
 					int size = 0;
