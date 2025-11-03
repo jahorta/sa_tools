@@ -1521,7 +1521,8 @@ namespace ArchiveLib
 
 		private void GetTextures(byte[] file, int offset)
 		{
-			Texlist = new nmldTextureList(file, offset, GetNameWithIndex());
+			Texlist = new nmldTextureList(file, offset, GetNameWithoutIndex());
+			TexFilenames = Texlist.TexList.TextureNames.ToList();
 		}
 
 		public string WriteEntryInfo()
