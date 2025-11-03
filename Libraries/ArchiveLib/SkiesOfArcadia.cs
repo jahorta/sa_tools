@@ -1356,33 +1356,43 @@ namespace ArchiveLib
 		public MotionType Type;
 		public byte[] File;
 
+		public string GetTypeString()
+		{
+			switch (Type)
+			{
+				case MotionType.Node:
+					return "_motion";
+				case MotionType.Shape:
+					return "_shape";
+				case MotionType.Camera:
+					return "_camera";
+				default:
+					return "_unknown";
+			}
+		}
+
 		public nmldMotion(byte[] file, int address, string name, string idx)
 		{
 			string magic = Encoding.ASCII.GetString(file, address, 4);
-			string suffix = "";
 
 			switch (magic)
 			{
 				case "NMDM":
 					Type = MotionType.Node;
-					suffix = "_motion";
 					break;
 				case "NSSM":
 					Type = MotionType.Shape;
-					suffix = "_shape";
 					break;
 				case "NCAM":
 					Type = MotionType.Camera;
-					suffix = "_camera";
 					break;
 				default:
 					Console.WriteLine("Unidentified Motion Type: %s", magic);
 					Type = MotionType.Unknown;
-					suffix = "_unknown";
 					break;
 			}
 
-			Name = name + suffix + idx;
+			Name = name + GetTypeString() + "_" + idx;
 
 			int njmsize = ByteConverter.ToInt32(file, address + 4) + 8;
 			int pofsize = ByteConverter.ToInt32(file, address + njmsize + 4) + 8;
