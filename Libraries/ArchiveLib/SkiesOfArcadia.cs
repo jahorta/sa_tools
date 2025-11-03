@@ -1742,6 +1742,12 @@ namespace ArchiveLib
 		{
 			return String.Join(',', list);
 		}
+
+		private static List<string> StringListFromManifestValue(string value)
+		{
+			if (value.Length == 0) return [];
+			return value.Split(',').ToList();
+		}
 	}
 
 	public class nmldArchiveFile
