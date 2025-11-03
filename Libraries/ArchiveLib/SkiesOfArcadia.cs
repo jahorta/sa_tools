@@ -1549,6 +1549,75 @@ namespace ArchiveLib
 			return sb.ToString();
 		}
 
+		public IniGroup GetManifestInfo()
+		{
+			IniGroup manifest_entry = new IniGroup();
+
+			manifest_entry.Add("EntryID", Index.ToString("D3"));
+			manifest_entry.Add("TblID", TblID.ToString("X4"));
+			manifest_entry.Add("Fxn", Fxn);
+
+			if (GroundLinks.Count > 0) {
+				manifest_entry.Add("GroundLinks", IntListToManifestValue(GroundLinks));
+			}
+			
+			if (ParamList2.Count > 0)
+			{
+				manifest_entry.Add("ParamList2", IntListToManifestValue(ParamList2));
+			}
+			
+			if (FunctionParameters.Count > 0)
+			{
+				manifest_entry.Add("FunctionParameters", IntListToManifestValue(FunctionParameters));
+			}
+
+			if (ObjectFilenames.Count > 0)
+			{
+				manifest_entry.Add("NJs", StringListToManifestValue(ObjectFilenames));
+			}
+
+			if (MotionFilenames.Count > 0)
+			{
+				manifest_entry.Add("Motions", StringListToManifestValue(MotionFilenames));
+			}
+
+			if (GroundFilenames.Count > 0)
+			{
+				manifest_entry.Add("Grnds", StringListToManifestValue(GroundFilenames));
+			}
+
+			if (TexFilenames.Count > 0)
+			{
+				manifest_entry.Add("Textures", StringListToManifestValue(TexFilenames));
+			}
+
+			manifest_entry.Add("Position", Position.ToString());
+			manifest_entry.Add("Rotation", Rotation.ToString());
+			manifest_entry.Add("Scale", Scale.ToString());
+
+			return manifest_entry;
+		}
+
+		public nmldEntry()
+		{
+			GroundLinks = new();
+			ParamList2 = new();
+			FunctionParameters = new();
+			ObjectAddresses = new();
+			GroundAddresses = new();
+			MotionAddresses = new();
+			ObjectFilenames = new();
+			GroundFilenames = new();
+			MotionFilenames = new();
+			Texlist = new();
+			Fxn = "";
+			Position = new();
+			Rotation = new();
+			Scale = new();
+			Index = 0xFFFF;
+			TblID = 0xFFFF;
+		}
+
 		public nmldEntry(int offset, byte[] file)
 		{
 			Index = ByteConverter.ToInt32(file, offset);
