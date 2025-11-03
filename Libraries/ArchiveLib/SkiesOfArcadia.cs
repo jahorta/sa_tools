@@ -1529,10 +1529,18 @@ namespace ArchiveLib
 		{
 			StringBuilder sb = new StringBuilder();
 
-			for (int i = 0; i < Objects.Count; i++)
+			for (int i = 0; i < ObjectAddresses.Count; i++)
 			{
 				sb.AppendLine(
-					Index.ToString("D3") + "_" + Fxn + "_" + i.ToString("D2") + 
+					GetNameAndIndex(i) +
+					", " + Position.ToString() +
+					", " + Rotation.ToString() +
+					", " + Scale.ToString());
+			}
+
+			for (int i = 0;i < GroundAddresses.Count; i++){
+				sb.AppendLine(
+					GetNameAndIndex(i) +
 					", " + Position.ToString() + 
 					", " + Rotation.ToString() + 
 					", " + Scale.ToString());
