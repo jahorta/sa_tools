@@ -1336,6 +1336,18 @@ namespace ArchiveLib
 				case "GRND":
 					Type = GroundType.Ground;
 					GRNDObj = new GRND(File, 0);
+					Console.WriteLine("Decoding GRND ({5}): XQuadNum={0:D2}, XQuadLen={1:D2}, ZQuadNum={2:D2}, ZQuadLen={3:D2}, QuadCount={4:D3}" +
+						", Bounds=( {6}, {8} : {7}, {9} )",
+						GRNDObj.XCount, 
+						GRNDObj.XLen, 
+						GRNDObj.ZCount, 
+						GRNDObj.ZLen, 
+						GRNDObj.XCount * GRNDObj.ZCount, 
+						Name,
+						GRNDObj.XMin,
+						GRNDObj.XMax,
+						GRNDObj.ZMin,
+						GRNDObj.ZMax);
 					break;
 				case "GOBJ":
 
