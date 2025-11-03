@@ -1444,7 +1444,7 @@ namespace ArchiveLib
 		public Vertex Rotation { get; set; } = new();
 		public Vertex Scale { get; set; } = new();
 
-		private string GetNameWithIndex()
+		public string GetNameWithoutIndex()
 		{
 			string bitID = "";
 			if (Fxn == "eventhook")
@@ -1454,7 +1454,7 @@ namespace ArchiveLib
 			return Index.ToString("D3") + "_" + Fxn + bitID;
 		}
 
-		private string GetNameAndIndex(int index)
+		public string GetNameAndIndex(int index)
 		{
 			string bitID = "";
 			if (Fxn == "eventhook")
