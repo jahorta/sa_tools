@@ -37,7 +37,7 @@ namespace ArchiveLib
 			uint unknown = ByteConverter.ToUInt32(file, offset + 12);
 
 			if (unknown != 0)
-				Console.WriteLine("Unknown Pointer in Object is populated: %s", unknown.ToString());
+				Console.WriteLine("Unknown Pointer in Object is populated: {0}", unknown.ToString());
 
 			int start = (ptrNJTL != 0) ? ptrNJTL : ptrNJCM;
 
