@@ -1791,6 +1791,7 @@ namespace ArchiveLib
 	public class nmldArchiveFile
 	{
 		public string Name { get; set; } = string.Empty;
+		public string Label { get; set; } = string.Empty;
 		public List<nmldEntry> Entries { get; set; } = new();
 		public PuyoFile TextureFile { get; set; }
 
@@ -1892,6 +1893,11 @@ namespace ArchiveLib
 			int realdatapointer = ByteConverter.ToInt32(file, 0x0C);
 			int textablepointer = ByteConverter.ToInt32(file, 0x10);
 			Console.WriteLine("Number of NMLD entries: {0}, NMLD data starts at {1}, real data starts at {2}", nmldCount, ptr_nmldTable.ToString("X"), realdatapointer.ToString("X"));
+
+			if (ptr_nmldTable > 0x14)
+			{
+				Label = Encoding.ASCII.GetString(file, 0x14, ptr_nmldTable - 0x14);
+			}
 
 			// Go ahead and extract the texture archive.
 			GetTextureArchive(file, textablepointer);
