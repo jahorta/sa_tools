@@ -14,6 +14,7 @@
 	  <PackageReference Include="AuroraLib.Compression-Extended" Version="1.1.0" />
 	</ItemGroup>
 	<ItemGroup>
+		<ProjectReference Include="..\NvTriStripDotNet\NvTriStripDotNet.csproj" />
 		<ProjectReference Include="..\SplitTools\SplitTools.csproj" />
 		<ProjectReference Include="..\SAModel\SAModel.csproj" />
 		<ProjectReference Include="..\VrSharp\VrSharp.csproj" />

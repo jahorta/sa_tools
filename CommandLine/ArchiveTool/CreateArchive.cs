@@ -68,7 +68,6 @@ namespace ArchiveTool
             bool createPB = false;
 			bool createARCX = false;
 			bool createAFS = false;
-			bool createMLD = false;
 			int afsblock = 0x80000;
 			AFSMetaMode afsmetamode = AFSMetaMode.OffsetEndTable;
             filePath = args[0];
@@ -91,11 +90,6 @@ namespace ArchiveTool
 				if (createARCX)
 				{
 					CreateARCX(filePath);
-					return;
-				}
-				if (createMLD)
-				{
-					//if 
 					return;
 				}
                 if (!File.Exists(indexfilename))

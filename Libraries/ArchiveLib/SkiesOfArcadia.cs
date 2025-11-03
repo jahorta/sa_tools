@@ -77,7 +77,7 @@ namespace ArchiveLib
 					if (Encoding.ASCII.GetString(file, cur_ptr, 4) == "NJCM")
 					{
 						njcmOffset = cur_ptr + 16;
-	}
+					}
 					if (Encoding.ASCII.GetString(file, cur_ptr, 4) == "NJTL")
 					{
 						njtlOffset = cur_ptr + 16;
@@ -1164,7 +1164,7 @@ namespace ArchiveLib
 			public NJS_OBJECT ToObject()
 			{
 				NJS_OBJECT obj = new ();
-					
+
 				Vertex[] normals;
 				if (Normals != null && Normals.Length == (Vertices?.Length ?? 0))
 					normals = Normals;
@@ -1190,20 +1190,20 @@ namespace ArchiveLib
 					UseLegacyAnchorPacking = use_legacy_anchor_packing
 				};
 				return codec.Encode(this);
-						}
+			}
 
 			public GRND(ModelFile file, string name)
-				{
+			{
 				NJS_OBJECT obj = file.Model;
 
 				BasicAttach attach = (BasicAttach)obj.Attach;
 				Vertices = attach.Vertex;
 				Meshes = attach.Mesh;
 				Normals = attach.Normal;
-					}
-					
+			}
+
 			public GRND(byte[] file, int address)
-					{
+			{
 				var codec = new GRNDCodec();
 				var res = codec.Decode(file, address);
 
@@ -1250,7 +1250,7 @@ namespace ArchiveLib
 			public NJS_OBJECT GroundObject;
 
 			public GOBJ(byte[] file, int address)
-			{                   
+			{
 				//int addr = 16;
 				//GroundObject = get_GOBJ_node(file, addr);
 			}
@@ -1373,7 +1373,7 @@ namespace ArchiveLib
 		}
 
 		static public nmldGround FromGrndFile(byte[] file, string name, bool use_a_star, bool use_legacy_anchor_packing)
-			{
+		{
 			nmldGround grnd = new nmldGround();
 
 			grnd.Name = name;
@@ -1556,7 +1556,7 @@ namespace ArchiveLib
 				if (address != 0)
 				{
 					MotionAddresses.Add(address);
-			}
+				}
 			}
 		}
 
@@ -1597,8 +1597,8 @@ namespace ArchiveLib
 			for (int i = 0;i < GroundAddresses.Count; i++){
 				sb.AppendLine(
 					GetNameAndIndex(i) +
-					", " + Position.ToString() + 
-					", " + Rotation.ToString() + 
+					", " + Position.ToString() +
+					", " + Rotation.ToString() +
 					", " + Scale.ToString());
 			}
 
@@ -1779,7 +1779,7 @@ namespace ArchiveLib
 			entry.Scale = new Vertex(entry_ini["Scale"]);
 
 			return entry;
-	}
+		}
 
 		public byte[] GetBytes()
 		{
@@ -1899,8 +1899,8 @@ namespace ArchiveLib
 					foreach (int addr in entry.ObjectAddresses)
 					{
 						ObjectAddresses.Add(addr);
-			}
-		}
+					}
+				}
 				if (entry.MotionAddresses.Count > 0)
 				{
 					foreach (int addr in entry.MotionAddresses)
@@ -2585,7 +2585,7 @@ namespace ArchiveLib
 
 		public class MLDArchiveEntry : GenericArchiveEntry
 		{
-
+			
 			public override Bitmap GetBitmap()
 			{
 				throw new NotImplementedException();
@@ -2602,54 +2602,54 @@ namespace ArchiveLib
 		{
 			StringBuilder sb = new StringBuilder();
 
-				// Add Objects
+			// Add Objects
 			foreach (KeyValuePair<int, nmldObject> o in archive.Objects)
-				{
+			{
 				nmldObject model = o.Value;
-					Entries.Add(new MLDArchiveEntry(model.File, model.Name + ".nj"));
-				}
+				Entries.Add(new MLDArchiveEntry(model.File, model.Name + ".nj"));
+			}
 
-				// Add Ground/Ground Object Files
+			// Add Ground/Ground Object Files
 			foreach (KeyValuePair<int, nmldGround> g in archive.Grounds)
-				{
+			{
 				nmldGround ground = g.Value;
-					ModelFile mfile = new ModelFile(ModelFormat.Basic, ground.ConvertedObject, null, null);
-					switch (ground.Type)
-					{
-						case nmldGround.GroundType.Ground:
+				ModelFile mfile = new ModelFile(ModelFormat.Basic, ground.ConvertedObject, null, null);
+				switch (ground.Type)
+				{
+					case nmldGround.GroundType.Ground:
 						Entries.Add(new MLDArchiveEntry(mfile.GetBytes(Path.Combine(directory, ground.Name + "_grnd.sa2mdl")), ground.Name + ".grnd.sa2mdl"));
 						//Entries.Add(new MLDArchiveEntry(ground.File, ground.Name + ".grnd"));
-							// mfile.SaveToFile(Path.Combine(directory, ground.Name + ".grnd.sa2mdl"));
-							break;
-						case nmldGround.GroundType.GroundObject:
+						// mfile.SaveToFile(Path.Combine(directory, ground.Name + ".grnd.sa2mdl"));
+						break;
+					case nmldGround.GroundType.GroundObject:
 						Entries.Add(new MLDArchiveEntry(ground.File, ground.Name + ".gobj"));
-							//mfile.SaveToFile(Path.Combine(directory, ground.Name + ".gobj.sa2mdl"));
-							break;
-						case nmldGround.GroundType.Unknown:
-							Entries.Add(new MLDArchiveEntry(ground.File, ground.Name + ".gunk"));
-							break;
-					}
+						//mfile.SaveToFile(Path.Combine(directory, ground.Name + ".gobj.sa2mdl"));
+						break;
+					case nmldGround.GroundType.Unknown:
+						Entries.Add(new MLDArchiveEntry(ground.File, ground.Name + ".gunk"));
+						break;
 				}
+			}
 
-				// Add Motions
+			// Add Motions
 			foreach (KeyValuePair<int, nmldMotion> m in archive.Motions)
-				{
+			{
 				nmldMotion motion = m.Value;
-					switch (motion.Type)
-					{
-						case nmldMotion.MotionType.Node:
-							Entries.Add(new MLDArchiveEntry(motion.File, motion.Name + ".njm"));
-							break;
-						case nmldMotion.MotionType.Shape:
-							Entries.Add(new MLDArchiveEntry(motion.File, motion.Name + ".njs"));
-							break;
-						case nmldMotion.MotionType.Camera:
-							Entries.Add(new MLDArchiveEntry(motion.File, motion.Name + ".njc"));
-							break;
-						case nmldMotion.MotionType.Unknown:
-							Entries.Add(new MLDArchiveEntry(motion.File, motion.Name + ".num"));
-							break;
-					}
+				switch (motion.Type)
+				{
+					case nmldMotion.MotionType.Node:
+						Entries.Add(new MLDArchiveEntry(motion.File, motion.Name + ".njm"));
+						break;
+					case nmldMotion.MotionType.Shape:
+						Entries.Add(new MLDArchiveEntry(motion.File, motion.Name + ".njs"));
+						break;
+					case nmldMotion.MotionType.Camera:
+						Entries.Add(new MLDArchiveEntry(motion.File, motion.Name + ".njc"));
+						break;
+					case nmldMotion.MotionType.Unknown:
+						Entries.Add(new MLDArchiveEntry(motion.File, motion.Name + ".num"));
+						break;
+				}
 			}			// Add Texture Archive
 
 			IniDictionary manifest_ini = new IniDictionary();
@@ -2678,7 +2678,7 @@ namespace ArchiveLib
 			if (archive.Label.Length > 0)
 			{
 				details.Add("Label", archive.Label);
-				}
+			}
 
 			manifest_ini.Add("Details", details);
 
