@@ -1265,6 +1265,11 @@ namespace ArchiveLib
 		private GRND GRNDObj;
 		//private GOBJ GOBJChunk; // TODO: Implement GOBJChunk reading proper.
 
+		public nmldGround()
+		{
+
+		}
+
 		public nmldGround(byte[] file, int address, string name)
 		{
 			// These chunks are actually condensed chunk models.
