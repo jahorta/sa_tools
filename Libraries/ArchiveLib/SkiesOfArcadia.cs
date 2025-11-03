@@ -26,6 +26,7 @@ namespace ArchiveLib
 	public class nmldObject
 	{
 		public string Name;
+		public byte[] Header;
 		public byte[] File;
 
 		public nmldObject(byte[] file, int offset, string name)
@@ -51,7 +52,50 @@ namespace ArchiveLib
 
 			Name = name;
 		}
+
+		public nmldObject(byte[] file, string name)
+		{
+			// build header line
+			// 0x0 offset of any NJCM present
+			// 0x4 file size including header
+			// 0x8 offset of any NJTL present (usually before NJCM?)
+			// 0xc unknown (usually set to zero
+
+			File = file;
+
+			byte[] header = new byte[16];
+			ByteConverter.GetBytes(file.Length + 16).CopyTo(header, 4);
+
+			int njtlOffset = 0;
+			int njcmOffset = 0;
+			bool bothFound = false;
+			int cur_ptr = 0;
+			while (cur_ptr < file.Length && !bothFound)
+			{
+				if (file[cur_ptr] == 'N')
+				{
+					if (Encoding.ASCII.GetString(file, cur_ptr, 4) == "NJCM")
+					{
+						njcmOffset = cur_ptr + 16;
 	}
+					if (Encoding.ASCII.GetString(file, cur_ptr, 4) == "NJTL")
+					{
+						njtlOffset = cur_ptr + 16;
+					}
+				}
+
+				if (njtlOffset != 0 && njcmOffset != 0) bothFound = true;
+
+				cur_ptr++;
+			}
+
+			ByteConverter.GetBytes(njtlOffset).CopyTo(header, 8);
+			ByteConverter.GetBytes(njcmOffset).CopyTo(header, 0);
+
+			Header = header;
+		}
+	}
+
 
 	public class nmldGround
 	{
