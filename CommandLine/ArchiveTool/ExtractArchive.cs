@@ -88,9 +88,17 @@ namespace ArchiveTool
                     break;
                 case (".mld"):
 					bool nodup = false;
-					if (args.Count() > 1 && args[1] == "-nodup") { nodup = true; outputPath += "_new"; }
+					bool grnd_decode = true;
+					if (args.Length > 1)
+					{
+						for (int i = 1; i < args.Length; i++)
+						{
+							if (args[i] == "-nodup") { nodup = true; outputPath += "_nodup"; }
+							if (args[i] == "-grnd") { grnd_decode = false;}
+						}
+					}
 					if (!Directory.Exists(outputPath)) Directory.CreateDirectory(outputPath);
-                    arc = new MLDArchive(filePath, arcdata, nodup);
+                    arc = new MLDArchive(filePath, arcdata, nodup, grnd_decode);
                     break;
                 case (".mlt"):
                 case (".gcaxmlt"):

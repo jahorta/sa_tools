@@ -1390,6 +1390,13 @@ namespace ArchiveLib
 			}
 
 			grnd.Type = GroundType.Ground;
+
+			if (Encoding.ASCII.GetString(file, 0, 4) == "GRND")
+			{
+				grnd.File = file;
+				return grnd;
+			}
+
 			ModelFile obj = new ModelFile(file, name);
 			grnd.GRNDObj = new GRND(obj, name);
 			grnd.File = grnd.GRNDObj.GetBytes(use_a_star, use_legacy_anchor_packing);
@@ -2598,7 +2605,7 @@ namespace ArchiveLib
 			}
 		}
 
-		private void ExtractEntriesNoDup(nmldArchiveFile archive, string directory)
+		private void ExtractEntriesNoDup(nmldArchiveFile archive, string directory, bool grnd_decode)
 		{
 			StringBuilder sb = new StringBuilder();
 
@@ -2617,8 +2624,10 @@ namespace ArchiveLib
 				switch (ground.Type)
 				{
 					case nmldGround.GroundType.Ground:
-						Entries.Add(new MLDArchiveEntry(mfile.GetBytes(Path.Combine(directory, ground.Name + "_grnd.sa2mdl")), ground.Name + ".grnd.sa2mdl"));
-						//Entries.Add(new MLDArchiveEntry(ground.File, ground.Name + ".grnd"));
+						if (grnd_decode)
+							Entries.Add(new MLDArchiveEntry(mfile.GetBytes(Path.Combine(directory, ground.Name + ".sa2mdl")), ground.Name + ".sa2mdl"));
+						else
+							Entries.Add(new MLDArchiveEntry(ground.File, ground.Name + ".grnd"));
 						// mfile.SaveToFile(Path.Combine(directory, ground.Name + ".grnd.sa2mdl"));
 						break;
 					case nmldGround.GroundType.GroundObject:
@@ -2709,11 +2718,11 @@ namespace ArchiveLib
 
 		}
 
-		private void ExtractEntries(nmldArchiveFile archive, string directory, bool nodup)
+		private void ExtractEntries(nmldArchiveFile archive, string directory, bool nodup, bool grnd_decode)
 		{
 			if (nodup)
 			{ 
-				ExtractEntriesNoDup(archive, directory); 
+				ExtractEntriesNoDup(archive, directory, grnd_decode); 
 				return; 
 			}			
 			if (!Directory.Exists(directory))
@@ -2813,7 +2822,7 @@ namespace ArchiveLib
 			}
 		}
 
-		public MLDArchive(string filepath, byte[] file, bool nodup)
+		public MLDArchive(string filepath, byte[] file, bool nodup, bool grnd_decode)
 		{
 			string directory = Path.Combine(Path.GetDirectoryName(filepath), Path.GetFileNameWithoutExtension(filepath));
 			string filename = Path.GetFileNameWithoutExtension(filepath);
@@ -2867,7 +2876,7 @@ namespace ArchiveLib
 
 			if (archive != new nmldArchiveFile())
 			{
-				ExtractEntries(archive, directory, nodup);
+				ExtractEntries(archive, directory, nodup, grnd_decode);
 			}
 			else
 				Console.WriteLine("Unable to read archive.");

@@ -26,7 +26,7 @@ namespace ArchiveTool
                 Console.WriteLine("Creating a PRS compressed binary: ArchiveTool -prs <file>\n");
                 Console.WriteLine("Creating an AFS archive: ArchiveTool <file> -afs [-nometa] [-metafirst]\n-nometa: Don't store filenames and timestamps\n-metafirst: Store metadata pointer before the first file entry instead of the end of the entry table.\n");
 				Console.WriteLine("Creating an MLD Archive file (Skies of Arcadia): ArchiveTool -mld <manifestfile> [-astar] [-legacy] \nThe tool will package an MLD file from a manifest file.\n -astar: Use A* algorithm for finding triangle strips in GRND blocks. Slow but smaller files.\n -legacy: Use legacy packing method for GRND blocks. Messier but smaller files.\n");
-				Console.WriteLine("Extracting contents from Skies of Arcadia (And Legends) MLD Files: ArchiveTool <mldfile> [-nodup] \nThe tool will decompress Skies of Arcadia Legends MLD files.\n -nodup: remove duplicate mld object files.");
+				Console.WriteLine("Extracting contents from Skies of Arcadia (And Legends) MLD Files: ArchiveTool <mldfile> [-nodup] [-grnd] \nThe tool will decompress Skies of Arcadia Legends MLD files.\n -nodup: remove duplicate mld object files.\n -grnd: don't try to decode GRND blocks, just put them as a file (helps with repacking for now and only applies when -nodup is used).");
 				Console.WriteLine("Press ENTER to exit.");
                 Console.ReadLine();
                 return;
