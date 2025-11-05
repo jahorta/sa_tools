@@ -2591,7 +2591,7 @@ namespace ArchiveLib
 			}
 		}
 
-		private void ExtractEntriesNoDup(nmldArchiveFile archive, string directory, bool grnd_decode)
+		private void ExtractEntriesNoDup(nmldArchiveFile archive, string directory, bool grnd_decode, bool separate_textures)
 		{
 			StringBuilder sb = new StringBuilder();
 
@@ -2656,18 +2656,31 @@ namespace ArchiveLib
 			
 			if (archive.TextureFile != new PuyoFile())
 			{
-				string ext = "";
+				string arc_ext = "";
+				string file_ext = "";
 				switch (archive.TextureFile.Type)
 				{
 					case PuyoArchiveType.PVMFile:
-						ext = ".pvm";
+						arc_ext = ".pvm";
+						file_ext = ".pvr";
 						break;
 					case PuyoArchiveType.GVMFile:
-						ext = ".gvm";
+						arc_ext = ".gvm";
+						file_ext = ".gvr";
 						break;
 				}
-				Entries.Add(new MLDArchiveEntry(archive.TextureFile.GetBytes(), archive.Name + ext));
-				details.Add("TextureFile", archive.Name + ext);
+				if (separate_textures)
+				{
+					foreach (GenericArchiveEntry texture in archive.TextureFile.Entries)
+					{
+						Entries.Add(new MLDArchiveEntry(texture.Data, texture.Name + file_ext));
+					}
+				} else
+				{
+
+					Entries.Add(new MLDArchiveEntry(archive.TextureFile.GetBytes(), archive.Name + arc_ext));
+					details.Add("TextureFile", archive.Name + arc_ext);
+				}
 			}
 
 			if (archive.Label.Length > 0)
@@ -2679,13 +2692,6 @@ namespace ArchiveLib
 
 			foreach (nmldEntry entry in archive.Entries)
 			{
-
-				//// Save Texlist
-				//if (entry.Texlist.TexList.NumTextures > 0)
-				//{
-				//	entry.Texlist.TexList.Save(Path.Combine(directory + "_new", entry.Texlist.Name));
-				//}
-
 				manifest_ini.Add(entry.Index.ToString("D3"), entry.GetManifestInfo());
 			}
 
@@ -2704,11 +2710,11 @@ namespace ArchiveLib
 
 		}
 
-		private void ExtractEntries(nmldArchiveFile archive, string directory, bool nodup, bool grnd_decode)
+		private void ExtractEntries(nmldArchiveFile archive, string directory, bool nodup, bool grnd_decode, bool separate_textures)
 		{
 			if (nodup)
 			{ 
-				ExtractEntriesNoDup(archive, directory, grnd_decode); 
+				ExtractEntriesNoDup(archive, directory, grnd_decode, separate_textures); 
 				return; 
 			}			
 			if (!Directory.Exists(directory))
@@ -2812,7 +2818,7 @@ namespace ArchiveLib
 			}
 		}
 
-		public MLDArchive(string filepath, byte[] file, bool nodup, bool grnd_decode)
+		public MLDArchive(string filepath, byte[] file, bool nodup, bool grnd_decode, bool separate_textures)
 		{
 			string directory = Path.Combine(Path.GetDirectoryName(filepath), Path.GetFileNameWithoutExtension(filepath));
 			string filename = Path.GetFileNameWithoutExtension(filepath);
@@ -2866,7 +2872,7 @@ namespace ArchiveLib
 
 			if (archive != new nmldArchiveFile())
 			{
-				ExtractEntries(archive, directory, nodup, grnd_decode);
+				ExtractEntries(archive, directory, nodup, grnd_decode, separate_textures);
 			}
 			else
 				Console.WriteLine("Unable to read archive.");
