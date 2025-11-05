@@ -1544,11 +1544,7 @@ namespace ArchiveLib
 			for (int i = 0; i < count; i++)
 			{
 				int address = ByteConverter.ToInt32(file, offset + (4 * (i + 1)));
-				
-				if (address != 0)
-				{
-					ObjectAddresses.Add(address);
-				}
+				ObjectAddresses.Add(address);
 			}
 		}
 
@@ -1559,11 +1555,7 @@ namespace ArchiveLib
 			for (int i = 0; i < count; i++)
 			{
 				int address = ByteConverter.ToInt32(file, offset + (4 * (i + 1)));
-
-				if (address != 0)
-				{
-					MotionAddresses.Add(address);
-				}
+				MotionAddresses.Add(address);
 			}
 		}
 
@@ -1574,11 +1566,7 @@ namespace ArchiveLib
 			for (int i = 0; i < count; i++)
 			{
 				int address = ByteConverter.ToInt32(file, offset + (4 * (i + 1)));
-
-				if (address != 0)
-				{
-					GroundAddresses.Add(address);
-				}
+				GroundAddresses.Add(address);
 			}
 		}
 
@@ -1634,20 +1622,10 @@ namespace ArchiveLib
 				manifest_entry.Add("FunctionParameters", IntListToManifestValue(FunctionParameters));
 			}
 
-			if (ObjectFilenames.Count > 0)
-			{
-				manifest_entry.Add("NJs", StringListToManifestValue(ObjectFilenames));
-			}
 
-			if (MotionFilenames.Count > 0)
-			{
-				manifest_entry.Add("Motions", StringListToManifestValue(MotionFilenames));
-			}
-
-			if (GroundFilenames.Count > 0)
-			{
-				manifest_entry.Add("Grnds", StringListToManifestValue(GroundFilenames));
-			}
+			manifest_entry.Add("NJs", StringListToManifestValue(ObjectFilenames));
+			manifest_entry.Add("Motions", StringListToManifestValue(MotionFilenames));
+			manifest_entry.Add("Grnds", StringListToManifestValue(GroundFilenames));
 
 			if (TexFilenames.Count > 0)
 			{
@@ -1695,18 +1673,15 @@ namespace ArchiveLib
 
 			// Get Entry Objects
 			int ptrObjects = ByteConverter.ToInt32(file, offset + 0x14);
-			if (ByteConverter.ToInt32(file, ptrObjects + 4) != 0)
-				GetObjects(file, ptrObjects);
+			GetObjects(file, ptrObjects);
 
 			// Get Entry Grounds
 			int ptrGrounds = ByteConverter.ToInt32(file, offset + 0x18);
-			if (ByteConverter.ToInt32(file, ptrGrounds + 4) != 0)
-				GetGrounds(file, ptrGrounds);
+			GetGrounds(file, ptrGrounds);
 
 			// Get Entry Motions
 			int ptrMotions = ByteConverter.ToInt32(file, offset + 0x1C);
-			if (ByteConverter.ToInt32(file, ptrMotions) != 0)
-				GetMotions(file, ptrMotions);
+			GetMotions(file, ptrMotions);
 
 			// Get Entry Textures
 			int ptrTextures = ByteConverter.ToInt32(file, offset + 0x20);
@@ -1776,9 +1751,14 @@ namespace ArchiveLib
 			if (entry_ini.ContainsKey("GroundLinks")) entry.GroundLinks = IntListFromManifestValue(entry_ini["GroundLinks"]);
 			if (entry_ini.ContainsKey("ParamList2")) entry.ParamList2 = IntListFromManifestValue(entry_ini["ParamList2"]);
 			if (entry_ini.ContainsKey("FunctionParameters")) entry.FunctionParameters = IntListFromManifestValue(entry_ini["FunctionParameters"]);
-			if (entry_ini.ContainsKey("NJs")) entry.ObjectFilenames = StringListFromManifestValue(entry_ini["NJs"]);
-			if (entry_ini.ContainsKey("Motions")) entry.MotionFilenames = StringListFromManifestValue(entry_ini["Motions"]);
-			if (entry_ini.ContainsKey("Grnds")) entry.GroundFilenames = StringListFromManifestValue(entry_ini["Grnds"]);
+			entry.ObjectFilenames = StringListFromManifestValue(entry_ini["NJs"]);
+			entry.MotionFilenames = StringListFromManifestValue(entry_ini["Motions"]);
+			entry.GroundFilenames = StringListFromManifestValue(entry_ini["Grnds"]);
+
+			entry.ObjectAddresses = Enumerable.Repeat(0x0, entry.ObjectFilenames.Count).ToList();
+			entry.MotionAddresses = Enumerable.Repeat(0x0, entry.MotionFilenames.Count).ToList();
+			entry.GroundAddresses = Enumerable.Repeat(0x0, entry.GroundFilenames.Count).ToList();
+
 			if (entry_ini.ContainsKey("Textures")) entry.TexFilenames = StringListFromManifestValue(entry_ini["Textures"]);
 			entry.Fxn = entry_ini["Fxn"];
 			entry.Position = new Vertex(entry_ini["Position"]);
@@ -1905,6 +1885,7 @@ namespace ArchiveLib
 				{
 					foreach (int addr in entry.ObjectAddresses)
 					{
+						if (addr == 0) continue;
 						ObjectAddresses.Add(addr);
 					}
 				}
@@ -1912,6 +1893,7 @@ namespace ArchiveLib
 				{
 					foreach (int addr in entry.MotionAddresses)
 					{
+						if (addr == 0) continue;
 						MotionAddresses.Add(addr);
 					}
 				}
@@ -1919,6 +1901,7 @@ namespace ArchiveLib
 				{
 					foreach (int addr in entry.GroundAddresses)
 					{
+						if (addr == 0) continue;
 						GroundAddresses.Add(addr);
 					}
 				}
@@ -1929,23 +1912,26 @@ namespace ArchiveLib
 		private void GetNmldPieces(byte[] file)
 		{
 			string base_name = Name;
-			int count = 0;
+			int count = 1;
 			foreach (int offset in ObjectAddresses)
 			{
+				if (offset == 0) continue;
 				string filename = base_name + "_NJ_" + count.ToString("D3");
-				count++;
 				Objects.Add(offset, new nmldObject(file, offset, filename));
+				count++;
 			}
 			foreach (int offset in MotionAddresses)
 			{
+				if (offset == 0) continue;
 				Motions.Add(offset, new nmldMotion(file, offset, base_name, count.ToString("D3")));
 				count++;
 			}
 			foreach (int offset in GroundAddresses)
 			{
+				if (offset == 0) continue;
 				string filename = base_name + "_" + count.ToString("D3");
-				count++;
 				Grounds.Add(offset, new nmldGround(file, offset, filename));
+				count++;
 			}
 		}
 
@@ -1953,34 +1939,28 @@ namespace ArchiveLib
 		{
 			foreach (nmldEntry entry in Entries)
 			{
-				if (entry.ObjectAddresses.Count > 0)
+				foreach (int addr in entry.ObjectAddresses)
 				{
-					foreach (int addr in entry.ObjectAddresses)
-					{
-						if (Objects.TryGetValue(addr, out nmldObject obj))
-						{ 
-							entry.ObjectFilenames.Add(obj.Name); 
-						}
+					if (addr == 0) entry.ObjectFilenames.Add("---");
+					if (Objects.TryGetValue(addr, out nmldObject obj))
+					{ 
+						entry.ObjectFilenames.Add(obj.Name); 
 					}
 				}
-				if (entry.MotionAddresses.Count > 0)
+				foreach (int addr in entry.MotionAddresses)
 				{
-					foreach (int addr in entry.MotionAddresses)
+					if (addr == 0) entry.MotionFilenames.Add("---");
+					if (Motions.TryGetValue(addr, out nmldMotion obj))
 					{
-						if (Motions.TryGetValue(addr, out nmldMotion obj))
-						{
-							entry.MotionFilenames.Add(obj.Name);
-						}
+						entry.MotionFilenames.Add(obj.Name);
 					}
 				}
-				if (entry.GroundAddresses.Count > 0)
+				foreach (int addr in entry.GroundAddresses)
 				{
-					foreach (int addr in entry.GroundAddresses)
+					if (addr == 0) entry.GroundFilenames.Add("---");
+					if (Grounds.TryGetValue(addr, out nmldGround obj))
 					{
-						if (Grounds.TryGetValue(addr, out nmldGround obj))
-						{
-							entry.GroundFilenames.Add(obj.Name);
-						}
+						entry.GroundFilenames.Add(obj.Name);
 					}
 				}
 			}
@@ -2084,14 +2064,17 @@ namespace ArchiveLib
 
 				foreach (string filename in entry.ObjectFilenames)
 				{
+					if (filename == "---") continue;
 					if (!objectFilenames.Contains(filename)) objectFilenames.Add(filename);
 				}
 				foreach (string filename in entry.GroundFilenames)
 				{
+					if (filename == "---") continue;
 					if (!groundFilenames.Contains(filename)) groundFilenames.Add(filename);
 				}
 				foreach (string filename in entry.MotionFilenames)
 				{
+					if (filename == "---") continue;
 					if (!motionFilenames.Contains(filename)) motionFilenames.Add(filename);
 				}
 				foreach (string filename in entry.TexFilenames)
@@ -2161,7 +2144,7 @@ namespace ArchiveLib
 			}
 
 			// attempt to find and encode all object files that are requested
-			int i = 0;
+			int i =  0x1BAD0001;
 			foreach (string filename in objectFilenames)
 			{
 				string[] texFilePaths = Directory.GetFiles(directoryPath, filename + ".nj", SearchOption.AllDirectories);
@@ -2178,10 +2161,10 @@ namespace ArchiveLib
 					nmldFile.Objects.Add(i, new nmldObject(texFileBytes, filename));
 					foreach (nmldEntry entry in nmldFile.Entries) 
 					{
-						if (entry.ObjectFilenames.Contains(filename))
-						{
-							entry.ObjectAddresses.Add(i);
-						}
+						
+						int idx = entry.ObjectFilenames.IndexOf(filename);
+						if (idx > -1)
+							entry.ObjectAddresses[idx] = i;
 					}
 				}
 				i++;
@@ -2203,10 +2186,9 @@ namespace ArchiveLib
 					nmldFile.Grounds.Add(i, nmldGround.FromGrndFile(grndFileBytes, filename, nmldFile.UseAStar, nmldFile.UseLegacyAnchorPacking));
 					foreach (nmldEntry entry in nmldFile.Entries)
 					{
-						if (entry.GroundFilenames.Contains(filename))
-						{
-							entry.GroundAddresses.Add(i);
-						}
+						int idx = entry.ObjectFilenames.IndexOf(filename);
+						if (idx > -1)
+							entry.GroundAddresses[idx] = i;
 					}
 				}
 				i++;
@@ -2228,10 +2210,9 @@ namespace ArchiveLib
 					nmldFile.Motions.Add(i, new nmldMotion(motionFileBytes, 0, filename, "0"));
 					foreach (nmldEntry entry in nmldFile.Entries)
 					{
-						if (entry.MotionFilenames.Contains(filename))
-						{
-							entry.MotionAddresses.Add(i);
-						}
+						int idx = entry.MotionFilenames.IndexOf(filename);
+						if (idx > -1)
+							entry.MotionAddresses[idx] = i;
 					}
 				}
 				i++;
@@ -2301,7 +2282,7 @@ namespace ArchiveLib
 				{
 					foreach (int i in entry.ObjectAddresses) 
 					{
-						if (seenAddrs.Contains(i)) continue;
+						if (i == 0 || seenAddrs.Contains(i)) continue;
 						seenAddrs.Add(i);
 						dataOrder.Add(new Tuple<string, int>("NJ", i));
 						nmldDataSize += Objects[i].File.Length;
@@ -2312,7 +2293,7 @@ namespace ArchiveLib
 				{
 					foreach (int i in entry.GroundAddresses)
 					{
-						if (seenAddrs.Contains(i)) continue;
+						if (i == 0 || seenAddrs.Contains(i)) continue;
 						seenAddrs.Add(i);
 						dataOrder.Add(new Tuple<string, int>("GRND", i));
 						nmldDataSize += Grounds[i].File.Length;
@@ -2322,7 +2303,7 @@ namespace ArchiveLib
 				{
 					foreach (int i in entry.MotionAddresses)
 					{
-						if (seenAddrs.Contains(i)) continue;
+						if (i == 0 || seenAddrs.Contains(i)) continue;
 						seenAddrs.Add(i);
 						dataOrder.Add(new Tuple<string, int>("Motion", i));
 						nmldDataSize += Motions[i].File.Length;
@@ -2334,7 +2315,6 @@ namespace ArchiveLib
 			while (nmldDataSize % 0x10 != 0) nmldDataSize++;
 
 			// write data segments to data block
-
 			Dictionary<int, int> dataOffsets = new();
 			int dataOffsetPtr = 0;
 			byte[] nmldData = new byte[nmldDataSize];
@@ -2435,9 +2415,9 @@ namespace ArchiveLib
 				{
 					lists.AddRange(ByteConverter.GetBytes(e.ObjectAddresses.Count));
 					list_offset_ptr += 4;
-					foreach (int g in e.ObjectAddresses)
+					foreach (int o in e.ObjectAddresses)
 					{
-						lists.AddRange(ByteConverter.GetBytes(e.FunctionParameters.Count));
+						lists.AddRange(ByteConverter.GetBytes(o));
 						list_offset_ptr += 4;
 					}
 				} else
@@ -2474,9 +2454,9 @@ namespace ArchiveLib
 				{
 					lists.AddRange(ByteConverter.GetBytes(e.MotionAddresses.Count));
 					list_offset_ptr += 4;
-					foreach (int g in e.MotionAddresses)
+					foreach (int m in e.MotionAddresses)
 					{
-						lists.AddRange(ByteConverter.GetBytes(g));
+						lists.AddRange(ByteConverter.GetBytes(m));
 						list_offset_ptr += 4;
 					}
 				}
@@ -2544,6 +2524,7 @@ namespace ArchiveLib
 				int object_list_start_ptr = ByteConverter.ToInt32(indexData, i * 0x68 + 0x14) - listOffset;
 				for (int j = 0; j < Entries[i].ObjectAddresses.Count; j++)
 				{
+					if (Entries[i].ObjectAddresses[j] == 0) continue;
 					object_list_start_ptr += 4;
 					int object_index = Entries[i].ObjectAddresses[j];
 					int object_ptr = dataOffsets[object_index] + nmld_start_ptr;
@@ -2554,6 +2535,7 @@ namespace ArchiveLib
 				int ground_list_start_ptr = ByteConverter.ToInt32(indexData, i * 0x68 + 0x18) - listOffset;
 				for (int j = 0; j < Entries[i].GroundAddresses.Count; j++)
 				{
+					if (Entries[i].ObjectAddresses[j] == 0) continue;
 					ground_list_start_ptr += 4;
 					int ground_index = Entries[i].GroundAddresses[j];
 					int ground_ptr = dataOffsets[ground_index] + nmld_start_ptr;
@@ -2564,6 +2546,7 @@ namespace ArchiveLib
 				int motion_list_start_ptr = ByteConverter.ToInt32(indexData, i * 0x68 + 0x1C) - listOffset;
 				for (int j = 0; j < Entries[i].MotionAddresses.Count; j++)
 				{
+					if (Entries[i].ObjectAddresses[j] == 0) continue;
 					motion_list_start_ptr += 4;
 					int motion_index = Entries[i].MotionAddresses[j];
 					int motion_ptr = dataOffsets[motion_index] + nmld_start_ptr;
