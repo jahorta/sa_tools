@@ -88,13 +88,13 @@ namespace ArchiveTool
                     break;
                 case (".mld"):
 					bool nodup = false;
-					bool grnd_decode = true;
+					bool grnd_decode = false;
 					if (args.Length > 1)
 					{
 						for (int i = 1; i < args.Length; i++)
 						{
 							if (args[i] == "-nodup") { nodup = true; outputPath += "_nodup"; }
-							if (args[i] == "-grnd") { grnd_decode = false;}
+							if (args[i] == "-grnd") { grnd_decode = true;}
 						}
 					}
 					if (!Directory.Exists(outputPath)) Directory.CreateDirectory(outputPath);
