@@ -1582,6 +1582,7 @@ namespace ArchiveLib
 
 			for (int i = 0; i < ObjectAddresses.Count; i++)
 			{
+				if (ObjectAddresses[i] == 0) continue;
 				sb.AppendLine(
 					GetNameAndIndex(i) +
 					", " + Position.ToString() +
@@ -1589,7 +1590,9 @@ namespace ArchiveLib
 					", " + Scale.ToString());
 			}
 
-			for (int i = 0;i < GroundAddresses.Count; i++){
+			for (int i = 0;i < GroundAddresses.Count; i++)
+			{
+				if (ObjectAddresses[i] == 0) continue;
 				sb.AppendLine(
 					GetNameAndIndex(i) +
 					", " + Position.ToString() +
@@ -2721,6 +2724,7 @@ namespace ArchiveLib
 				
 				for (int i = 0; i < entry.ObjectAddresses.Count; i++ )
 				{
+					if (entry.ObjectAddresses[i] == 0) continue;
 					if (!archive.Objects.TryGetValue(entry.ObjectAddresses[i], out nmldObject obj)) { continue; }
 					Entries.Add(new MLDArchiveEntry(obj.File, base_file_name + "_" + i.ToString("D2") + ".nj"));
 				}
@@ -2728,13 +2732,14 @@ namespace ArchiveLib
 				// Add Ground/Ground Object Files
 				for (int i = 0; i < entry.GroundAddresses.Count; i++)
 				{
+					if (entry.GroundAddresses[i] == 0) continue;
 					if (!archive.Grounds.TryGetValue(entry.GroundAddresses[i], out nmldGround ground)) { continue; }
 					ModelFile mfile = new ModelFile(ModelFormat.Basic, ground.ConvertedObject, null, null);
-					string name = base_file_name + i.ToString("D2") + "_";
+					string name = base_file_name + "_" + i.ToString("D2");
 					switch (ground.Type)
 					{
 						case nmldGround.GroundType.Ground:
-							Entries.Add(new MLDArchiveEntry(mfile.GetBytes(Path.Combine(directory, name + "_grnd.sa2mdl")), name + "_grnd.sa2mdl"));
+							Entries.Add(new MLDArchiveEntry(mfile.GetBytes(Path.Combine(directory, name + ".sa2mdl")), name + ".sa2mdl"));
 							// mfile.SaveToFile(Path.Combine(directory, ground.Name + "_grnd.sa2mdl"));
 							break;
 						case nmldGround.GroundType.GroundObject:
@@ -2750,12 +2755,14 @@ namespace ArchiveLib
 				// Add Motions
 				for (int i = 0; i < entry.MotionAddresses.Count; i++)
 				{
+					if (entry.MotionAddresses[i] == 0) continue;
 					if (!archive.Motions.TryGetValue(entry.MotionAddresses[i], out nmldMotion motion)) 
 					{
+						
 						Console.WriteLine("Failed to extract Motion at " + entry.GroundAddresses[i].ToString("X8"));
 						continue; 
 					}
-					string name = base_file_name + motion.GetTypeString() + i.ToString("D2");
+					string name = base_file_name + motion.GetTypeString() + "_" + i.ToString("D2");
 					switch (motion.Type)
 					{
 						case nmldMotion.MotionType.Node:
