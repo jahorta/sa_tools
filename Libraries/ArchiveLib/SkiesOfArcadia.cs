@@ -2538,7 +2538,7 @@ namespace ArchiveLib
 				int ground_list_start_ptr = ByteConverter.ToInt32(indexData, i * 0x68 + 0x18) - listOffset;
 				for (int j = 0; j < Entries[i].GroundAddresses.Count; j++)
 				{
-					if (Entries[i].ObjectAddresses[j] == 0) continue;
+					if (Entries[i].GroundAddresses[j] == 0) continue;
 					ground_list_start_ptr += 4;
 					int ground_index = Entries[i].GroundAddresses[j];
 					int ground_ptr = dataOffsets[ground_index] + nmld_start_ptr;
@@ -2549,7 +2549,7 @@ namespace ArchiveLib
 				int motion_list_start_ptr = ByteConverter.ToInt32(indexData, i * 0x68 + 0x1C) - listOffset;
 				for (int j = 0; j < Entries[i].MotionAddresses.Count; j++)
 				{
-					if (Entries[i].ObjectAddresses[j] == 0) continue;
+					if (Entries[i].MotionAddresses[j] == 0) continue;
 					motion_list_start_ptr += 4;
 					int motion_index = Entries[i].MotionAddresses[j];
 					int motion_ptr = dataOffsets[motion_index] + nmld_start_ptr;
