@@ -176,14 +176,14 @@ namespace SAModel
 					case NinjaBinaryChunkType.BasicModel:
 						// Add a label so that all models aren't called "object_00000000"
 						Dictionary<int, string> basicLabels = [];
-						basicLabels.Add(0, "object_" + chunk.ImageBase.ToString("X8"));
+						basicLabels.Add(0, "object_root_" + chunk.ImageBase.ToString("X8"));
 						Models.Add(new NJS_OBJECT(chunk.Data, 0, (uint)chunk.ImageBase, ModelFormat.Basic, basicLabels, new Dictionary<int, Attach>()));
 						modelCount++;
 						break;
 					case NinjaBinaryChunkType.ChunkModel:
 						// Add a label so that all models aren't called "object_00000000"
 						Dictionary<int, string> chunkLabels = [];
-						chunkLabels.Add(0, "object_" + chunk.ImageBase.ToString("X8"));
+						chunkLabels.Add(0, "object_root_" + chunk.ImageBase.ToString("X8"));
 						// NJCM can be Chunk (NJ file, Big or Little Endian), Ginja (GJ file) or XJ (XJ file)
 						Models.Add(new NJS_OBJECT(chunk.Data, 0, (uint)chunk.ImageBase, format, chunkLabels, new Dictionary<int, Attach>()));
 						modelCount++;
