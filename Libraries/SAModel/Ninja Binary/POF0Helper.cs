@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace SAModel
 {
 	// Class to work with pointer offset lists (POF) in Ninja Binary files
-	class POF0Helper
+	public class POF0Helper
 	{
 		private enum POFOffsetType: byte
 		{
