@@ -12,7 +12,7 @@ namespace SAModel
 			List<byte> njTLHeader = [];
 			List<byte> pof0List = [];
 
-			njTLHeader.AddRange(isGC ? "GJTL"u8 : "NTJL"u8);
+			njTLHeader.AddRange(isGC ? "GJTL"u8 : "NJTL"u8);
 			
 			njTexList.AddRange(ByteConverter.GetBytes(0x8));
 			njTexList.AddRange(ByteConverter.GetBytes(texList.Length));
