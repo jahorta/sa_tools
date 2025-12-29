@@ -28,8 +28,9 @@ namespace ArchiveLib
 		public string Name;
 		public byte[] Header;
 		public byte[] File;
+		public byte[] FileLittleEndian;
 
-		public nmldObject(byte[] file, int offset, string name)
+		public nmldObject(byte[] file, int offset, string name, bool output_as_little)
 		{
 			int ptrNJCM = ByteConverter.ToInt32(file, offset);
 			uint chunksize = ByteConverter.ToUInt32(file, offset + 4) - 16;
@@ -43,14 +44,65 @@ namespace ArchiveLib
 
 			if (start == 0)
 			{
-				Console.WriteLine("Objects have no data pointers.");
+				Console.WriteLine("Object(s) have no data pointers.");
 				return;
 			}
+
+			Name = name;
 
 			File = new byte[chunksize];
 			Array.Copy(file, start + offset, File, 0, chunksize);
 
-			Name = name;
+			if (!output_as_little)
+				return;
+
+			SAModel.NinjaBinaryFile njBin = new SAModel.NinjaBinaryFile(File, ModelFormat.Chunk);
+
+
+			bool isBig = ByteConverter.BigEndian;
+			ByteConverter.BigEndian = false;
+
+			List<byte> file_out = new List<byte>();
+			if (njBin.Texnames.Count > 0)
+			{
+				file_out.AddRange(NJTLHelper.GenerateNJTexList(njBin.Texnames[0], false, false));
+				file_out.Align(4);
+			}
+			Dictionary<string, uint> labels = new();
+			List<uint> njOffsets = new();
+			byte[] njs_obj = njBin.Models[0].NJGetBytes((UInt32)file_out.Count, false, labels, njOffsets, out uint addr);
+
+			List<byte> l_njs_obj = [.. njs_obj];
+			List<uint> offset_values = new List<uint>();
+			njOffsets.Sort();
+			uint file_offset = (uint)file_out.Count();
+			List<uint> POF0_offset_list = new List<uint>();
+			for (int i = 0; i < njOffsets.Count(); i++)
+			{
+				int i_offset = ByteConverter.ToInt32(njs_obj, (int)(njOffsets[i] - file_offset));
+				offset_values.Add((uint)i_offset);
+				if (i_offset != 0)
+				{
+					l_njs_obj.SetByteListInt((int)(njOffsets[i] - file_offset), (int)(i_offset - file_offset));
+					POF0_offset_list.Add(njOffsets[i] - file_offset);
+				}
+			}
+
+			byte[] pof0_bytes = SAModel.POF0Helper.GetPOFData(POF0_offset_list);
+
+			file_out.AddRange(Encoding.ASCII.GetBytes("NJCM"));
+			file_out.AddRange(ByteConverter.GetBytes(l_njs_obj.Count()));
+			file_out.AddRange(l_njs_obj);
+			file_out.AddRange(pof0_bytes);
+			file_out.Align(0x10);
+			if (file_out.Count % 0x20 == 0)
+			{
+				file_out.Add(0);
+				file_out.Align(0x10);
+			}
+			FileLittleEndian = file_out.ToArray();
+
+			ByteConverter.BigEndian = isBig;
 		}
 
 		public nmldObject(byte[] file, string name)
@@ -1912,7 +1964,7 @@ namespace ArchiveLib
 			}
 		}
 
-		private void GetNmldPieces(byte[] file)
+		private void GetNmldPieces(byte[] file, bool output_as_little)
 		{
 			string base_name = Name;
 			int count = 1;
@@ -1920,7 +1972,7 @@ namespace ArchiveLib
 			{
 				if (offset == 0) continue;
 				string filename = base_name + "_NJ_" + count.ToString("D3");
-				Objects.Add(offset, new nmldObject(file, offset, filename));
+				Objects.Add(offset, new nmldObject(file, offset, filename, output_as_little));
 				count++;
 			}
 			foreach (int offset in MotionAddresses)
@@ -1976,7 +2028,7 @@ namespace ArchiveLib
 			TextureFile = new();
 		}
 
-		public nmldArchiveFile(byte[] file, string name)
+		public nmldArchiveFile(byte[] file, string name, bool grnd_decode, bool output_as_little)
 		{
 			Name = name;
 
@@ -1999,7 +2051,7 @@ namespace ArchiveLib
 			GetEntries(file, ptr_nmldTable, nmldCount);
 
 			// Collect nMLD components
-			GetNmldPieces(file);
+			GetNmldPieces(file, output_as_little);
 
 			// Provide filenames for components
 			LinkEntriesToNmldPieces();
@@ -2591,7 +2643,7 @@ namespace ArchiveLib
 			}
 		}
 
-		private void ExtractEntriesNoDup(nmldArchiveFile archive, string directory, bool grnd_decode, bool separate_textures)
+		private void ExtractEntriesNoDup(nmldArchiveFile archive, string directory, bool grnd_decode, bool separate_textures, bool output_as_little)
 		{
 			StringBuilder sb = new StringBuilder();
 
@@ -2599,7 +2651,13 @@ namespace ArchiveLib
 			foreach (KeyValuePair<int, nmldObject> o in archive.Objects)
 			{
 				nmldObject model = o.Value;
+				if (output_as_little)
+				{
+					Entries.Add(new MLDArchiveEntry(model.FileLittleEndian, model.Name + "_dc.nj"));
+				} else
+				{
 				Entries.Add(new MLDArchiveEntry(model.File, model.Name + ".nj"));
+			}
 			}
 
 			// Add Ground/Ground Object Files
@@ -2710,11 +2768,11 @@ namespace ArchiveLib
 
 		}
 
-		private void ExtractEntries(nmldArchiveFile archive, string directory, bool nodup, bool grnd_decode, bool separate_textures)
+		private void ExtractEntries(nmldArchiveFile archive, string directory, bool nodup, bool grnd_decode, bool separate_textures, bool output_as_little)
 		{
 			if (nodup)
 			{ 
-				ExtractEntriesNoDup(archive, directory, grnd_decode, separate_textures); 
+				ExtractEntriesNoDup(archive, directory, grnd_decode, separate_textures, output_as_little); 
 				return; 
 			}			
 			if (!Directory.Exists(directory))
@@ -2818,7 +2876,7 @@ namespace ArchiveLib
 			}
 		}
 
-		public MLDArchive(string filepath, byte[] file, bool nodup, bool grnd_decode, bool separate_textures)
+		public MLDArchive(string filepath, byte[] file, bool nodup, bool grnd_decode, bool separate_textures, bool output_as_little)
 		{
 			string directory = Path.Combine(Path.GetDirectoryName(filepath), Path.GetFileNameWithoutExtension(filepath));
 			string filename = Path.GetFileNameWithoutExtension(filepath);
@@ -2853,7 +2911,7 @@ namespace ArchiveLib
 					{
 						Console.WriteLine("File Decompressed, saving and reading decompressed archive.");
 						Entries.Add(new MLDArchiveEntry(dfile, ("..\\" + filename + "_dec.mld")));
-						archive = new nmldArchiveFile(dfile, filename);
+						archive = new nmldArchiveFile(dfile, filename, grnd_decode, output_as_little);
 					}
 					else
 					{
@@ -2862,17 +2920,17 @@ namespace ArchiveLib
 					}
 				}
 				else
-					archive = new nmldArchiveFile(file, filename);
+					archive = new nmldArchiveFile(file, filename, grnd_decode, output_as_little);
 			}
 			else
 			{
 				Console.WriteLine("Skies of Arcadia MLD File");
-				archive = new nmldArchiveFile(file, filename);
+				archive = new nmldArchiveFile(file, filename, grnd_decode, output_as_little);
 			}
 
 			if (archive != new nmldArchiveFile())
 			{
-				ExtractEntries(archive, directory, nodup, grnd_decode, separate_textures);
+				ExtractEntries(archive, directory, nodup, grnd_decode, separate_textures, output_as_little);
 			}
 			else
 				Console.WriteLine("Unable to read archive.");
