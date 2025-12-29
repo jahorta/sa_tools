@@ -90,6 +90,7 @@ namespace ArchiveTool
 					bool nodup = false;
 					bool grnd_decode = false;
 					bool separate_textures = false;
+					bool output_as_little = false;
 					if (args.Length > 1)
 					{
 						for (int i = 1; i < args.Length; i++)
@@ -97,10 +98,11 @@ namespace ArchiveTool
 							if (args[i] == "-nodup") { nodup = true; outputPath += "_nodup"; }
 							if (args[i] == "-grnd") { grnd_decode = true; }
 							if (args[i] == "-tex") { separate_textures = true; }
+							if (args[i] == "-dc") { output_as_little = true; }
 						}
 					}
 					if (!Directory.Exists(outputPath)) Directory.CreateDirectory(outputPath);
-                    arc = new MLDArchive(filePath, arcdata, nodup, grnd_decode, separate_textures);
+                    arc = new MLDArchive(filePath, arcdata, nodup, grnd_decode, separate_textures, output_as_little);
                     break;
                 case (".mlt"):
                 case (".gcaxmlt"):
