@@ -1366,7 +1366,7 @@ namespace ArchiveLib
 
 		}
 
-		public nmldGround(byte[] file, int address, string name)
+		public nmldGround(byte[] file, int address, string name, bool decode)
 		{
 			// These chunks are actually condensed chunk models.
 			// GOBJ has actual NJS_OBJECTs and a "flipped" ChunkAttach/NJS_MODEL_CNK.
@@ -1382,6 +1382,8 @@ namespace ArchiveLib
 			Array.Copy(file, address, File, 0, filesize);
 
 			Name = name + "_" + magic;
+
+			if (!decode) return;
 
 			switch (magic)
 			{
@@ -1858,6 +1860,8 @@ namespace ArchiveLib
 		public bool UseAStar { get; set; } = false;
 		public bool UseLegacyAnchorPacking { get; set; } = false;
 
+		public bool GrndDecode { get; set; } = false;
+
 		private void GetTextureArchive(byte[] file, int offset)
 		{
 			Console.WriteLine("Getting Textures...");
@@ -1985,7 +1989,7 @@ namespace ArchiveLib
 			{
 				if (offset == 0) continue;
 				string filename = base_name + "_" + count.ToString("D3");
-				Grounds.Add(offset, new nmldGround(file, offset, filename));
+				Grounds.Add(offset, new nmldGround(file, offset, filename, GrndDecode));
 				count++;
 			}
 		}
@@ -2031,6 +2035,7 @@ namespace ArchiveLib
 		public nmldArchiveFile(byte[] file, string name, bool grnd_decode, bool output_as_little)
 		{
 			Name = name;
+			GrndDecode = grnd_decode;
 
 			int nmldCount		= ByteConverter.ToInt32(file, 0);
 			int ptr_nmldTable	= ByteConverter.ToInt32(file, 0x04);
