@@ -1,18 +1,13 @@
 ﻿using AuroraLib.Compression.Algorithms;
 using AuroraLib.Core.IO;
-using NvTriStripDotNet;
 using SAModel;
 using SplitTools;
 using System;
-using System.Buffers;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
-using System.Net;
 using System.Text;
-using System.Windows.Forms;
 
 //using SAModel.SAEditorCommon.ModelConversion;
 
