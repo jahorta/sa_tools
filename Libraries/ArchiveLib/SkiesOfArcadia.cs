@@ -1556,7 +1556,7 @@ namespace ArchiveLib
 				int next_int = ByteConverter.ToInt32(file, address + i);
 				ByteConverter.BigEndian = false;
 				file_out.AddRange(ByteConverter.GetBytes(next_int));
-		}
+			}
 
 			byte[] POF0_block = new byte[pofsize];
 			Array.Copy(file, address + njmsize + 8, POF0_block, 0, pofsize);
@@ -1566,7 +1566,7 @@ namespace ArchiveLib
 			{
 				last_offset_idx--;
 				if (last_offset_idx == 0) break;
-	}
+			}
 
 			List<byte> new_pof = new List<byte>();
 			for (int i = 0; i <= last_offset_idx; i++)
@@ -2050,23 +2050,23 @@ namespace ArchiveLib
 				if (offset == 0) continue;
 				if (ObjectAddresses.Contains(offset))
 				{
-				string filename = base_name + "_NJ_" + count.ToString("D3");
-				Objects.Add(offset, new nmldObject(file, offset, filename, output_as_little));
-				count++;
+					string filename = base_name + "_NJ_" + count.ToString("D3");
+					Objects.Add(offset, new nmldObject(file, offset, filename, output_as_little));
+					count++;
 				} else if (MotionAddresses.Contains(offset))
-			{
+				{
 					Motions.Add(offset, new nmldMotion(file, offset, base_name, count.ToString("D3"), output_as_little));
-				count++;
+					count++;
 				} else if (GroundAddresses.Contains(offset))
-			{
-				string filename = base_name + "_" + count.ToString("D3");
-				Grounds.Add(offset, new nmldGround(file, offset, filename, GrndDecode));
-				count++;
+				{
+					string filename = base_name + "_" + count.ToString("D3");
+					Grounds.Add(offset, new nmldGround(file, offset, filename, GrndDecode));
+					count++;
 				} else
 				{
 					Console.WriteLine("No file found at offset: " + offset.ToString());
+				}
 			}
-		}
 		}
 
 		private void LinkEntriesToNmldPieces()
@@ -2736,8 +2736,8 @@ namespace ArchiveLib
 					Entries.Add(new MLDArchiveEntry(model.FileLittleEndian, model.Name + ".nj"));
 				} else
 				{
-				Entries.Add(new MLDArchiveEntry(model.File, model.Name + ".nj"));
-			}
+					Entries.Add(new MLDArchiveEntry(model.File, model.Name + ".nj"));
+				}
 			}
 
 			// Add Ground/Ground Object Files
@@ -2776,7 +2776,7 @@ namespace ArchiveLib
 							Entries.Add(new MLDArchiveEntry(motion.FileLittleEndian, motion.Name + ".njm"));
 						} else
 						{
-						Entries.Add(new MLDArchiveEntry(motion.File, motion.Name + ".njm"));
+							Entries.Add(new MLDArchiveEntry(motion.File, motion.Name + ".njm"));
 						}
 						break;
 					case nmldMotion.MotionType.Shape:
@@ -2785,7 +2785,7 @@ namespace ArchiveLib
 							Entries.Add(new MLDArchiveEntry(motion.FileLittleEndian, motion.Name + ".njs"));
 						} else
 						{
-						Entries.Add(new MLDArchiveEntry(motion.File, motion.Name + ".njs"));
+							Entries.Add(new MLDArchiveEntry(motion.File, motion.Name + ".njs"));
 						}
 						break;
 					case nmldMotion.MotionType.Camera:
@@ -2863,7 +2863,7 @@ namespace ArchiveLib
 		private void ExtractEntries(nmldArchiveFile archive, string directory, bool nodup, bool grnd_decode, bool separate_textures, bool output_as_little)
 		{
 			if (nodup)
-			{ 
+			{
 				ExtractEntriesNoDup(archive, directory, grnd_decode, separate_textures, output_as_little); 
 				return; 
 			}			
