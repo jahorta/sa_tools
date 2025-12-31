@@ -2420,8 +2420,8 @@ namespace ArchiveLib
 						if (i == 0 || seenAddrs.Contains(i)) continue;
 						seenAddrs.Add(i);
 						dataOrder.Add(new Tuple<string, int>("NJ", i));
-						nmldDataSize += Objects[i].File.Length;
 						nmldDataSize += Objects[i].Header.Length;
+						nmldDataSize += Objects[i].File.Length;
 					}
 				}
 				if (entry.GroundAddresses.Count > 0)
