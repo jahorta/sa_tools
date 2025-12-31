@@ -1474,6 +1474,7 @@ namespace ArchiveLib
 		public string Name;
 		public MotionType Type;
 		public byte[] File;
+		public byte[] FileLittleEndian;
 
 		public string GetTypeString()
 		{
@@ -1490,7 +1491,7 @@ namespace ArchiveLib
 			}
 		}
 
-		public nmldMotion(byte[] file, int address, string name, string idx)
+		public nmldMotion(byte[] file, int address, string name, string idx, bool output_as_little = false)
 		{
 			string magic = Encoding.ASCII.GetString(file, address, 4);
 
@@ -1518,6 +1519,75 @@ namespace ArchiveLib
 
 			File = new byte[njmsize + pofsize];
 			Array.Copy(file, address, File, 0, njmsize + pofsize);
+
+			if (!output_as_little || !ByteConverter.BigEndian)
+			{
+				FileLittleEndian = File;
+				return;
+			}
+			Name += "_le";
+
+
+			ByteConverter.BigEndian = true;
+
+			uint fileSize = ByteConverter.ToUInt32(file, address + 4);
+			uint treeOffset = ByteConverter.ToUInt32(file, address + 8);
+			uint frameCount = ByteConverter.ToUInt32(file, address + 0xc);
+			ushort animFlags = ByteConverter.ToUInt16(file, address + 0x10);
+			AnimFlags animType = (AnimFlags)animFlags;
+			ushort animStyle = ByteConverter.ToUInt16(file, address + 0x12);
+
+			ushort otherFlags = (ushort)(animFlags & (short)~0x37);
+			if ( otherFlags != 0)
+			{
+				AnimFlags remainingFlags = (AnimFlags)(otherFlags);
+				Console.WriteLine("Unhandled motion types:" + remainingFlags.ToString() + "No output for " + Name);
+				return;
+			}
+
+			ByteConverter.BigEndian = false;
+
+			List<byte> file_out = new List<byte>();
+			file_out.AddRange(Encoding.ASCII.GetBytes(magic));
+			file_out.AddRange(ByteConverter.GetBytes(fileSize));
+			file_out.AddRange(ByteConverter.GetBytes(treeOffset));
+			file_out.AddRange(ByteConverter.GetBytes(frameCount));
+			file_out.AddRange(ByteConverter.GetBytes(animFlags));
+			file_out.AddRange(ByteConverter.GetBytes(animStyle));
+
+			for (int i = file_out.Count; i < njmsize; i += 4)
+			{
+				ByteConverter.BigEndian = true;
+				int next_int = ByteConverter.ToInt32(file, address + i);
+				ByteConverter.BigEndian = false;
+				file_out.AddRange(ByteConverter.GetBytes(next_int));
+		}
+
+			byte[] POF0_block = new byte[pofsize];
+			Array.Copy(file, address + njmsize + 8, POF0_block, 0, pofsize);
+
+			int last_offset_idx = pofsize;
+			while (POF0_block[last_offset_idx] == 0x00)
+			{
+				last_offset_idx--;
+				if (last_offset_idx == 0) break;
+	}
+
+			List<byte> new_pof = new List<byte>();
+			for (int i = 0; i <= last_offset_idx; i++)
+			{
+				new_pof.Add(POF0_block[i]);
+			}
+			new_pof.Align(4);
+
+			ByteConverter.BigEndian = false;
+			file_out.AddRange(Encoding.ASCII.GetBytes("POF0"));
+			file_out.AddRange(ByteConverter.GetBytes(new_pof.Count));
+			file_out.AddRange(new_pof);
+			file_out.Align(4);
+			FileLittleEndian = file_out.ToArray();
+
+			ByteConverter.BigEndian = true;
 		}
 	}
 
@@ -1973,27 +2043,35 @@ namespace ArchiveLib
 		private void GetNmldPieces(byte[] file, bool output_as_little)
 		{
 			string base_name = Name;
-			int count = 1;
-			foreach (int offset in ObjectAddresses)
+			int count = 0;
+
+			List<int> all_offsets = new List<int> { };
+			all_offsets.AddRange(ObjectAddresses);
+			all_offsets.AddRange(MotionAddresses);
+			all_offsets.AddRange(GroundAddresses);
+			all_offsets.Sort();
+			foreach (int offset in all_offsets)
 			{
 				if (offset == 0) continue;
+				if (ObjectAddresses.Contains(offset))
+				{
 				string filename = base_name + "_NJ_" + count.ToString("D3");
 				Objects.Add(offset, new nmldObject(file, offset, filename, output_as_little));
 				count++;
-			}
-			foreach (int offset in MotionAddresses)
+				} else if (MotionAddresses.Contains(offset))
 			{
-				if (offset == 0) continue;
-				Motions.Add(offset, new nmldMotion(file, offset, base_name, count.ToString("D3")));
+					Motions.Add(offset, new nmldMotion(file, offset, base_name, count.ToString("D3"), output_as_little));
 				count++;
-			}
-			foreach (int offset in GroundAddresses)
+				} else if (GroundAddresses.Contains(offset))
 			{
-				if (offset == 0) continue;
 				string filename = base_name + "_" + count.ToString("D3");
 				Grounds.Add(offset, new nmldGround(file, offset, filename, GrndDecode));
 				count++;
+				} else
+				{
+					Console.WriteLine("No file found at offset: " + offset.ToString());
 			}
+		}
 		}
 
 		private void LinkEntriesToNmldPieces()
@@ -2660,7 +2738,7 @@ namespace ArchiveLib
 				nmldObject model = o.Value;
 				if (output_as_little)
 				{
-					Entries.Add(new MLDArchiveEntry(model.FileLittleEndian, model.Name + "_dc.nj"));
+					Entries.Add(new MLDArchiveEntry(model.FileLittleEndian, model.Name + ".nj"));
 				} else
 				{
 				Entries.Add(new MLDArchiveEntry(model.File, model.Name + ".nj"));
@@ -2698,10 +2776,22 @@ namespace ArchiveLib
 				switch (motion.Type)
 				{
 					case nmldMotion.MotionType.Node:
+						if (output_as_little)
+						{
+							Entries.Add(new MLDArchiveEntry(motion.FileLittleEndian, motion.Name + ".njm"));
+						} else
+						{
 						Entries.Add(new MLDArchiveEntry(motion.File, motion.Name + ".njm"));
+						}
 						break;
 					case nmldMotion.MotionType.Shape:
+						if (output_as_little)
+						{
+							Entries.Add(new MLDArchiveEntry(motion.FileLittleEndian, motion.Name + ".njs"));
+						} else
+						{
 						Entries.Add(new MLDArchiveEntry(motion.File, motion.Name + ".njs"));
+						}
 						break;
 					case nmldMotion.MotionType.Camera:
 						Entries.Add(new MLDArchiveEntry(motion.File, motion.Name + ".njc"));
