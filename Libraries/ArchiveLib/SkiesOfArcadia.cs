@@ -56,6 +56,8 @@ namespace ArchiveLib
 			if (!output_as_little)
 				return;
 
+			Name += "_le";
+
 			SAModel.NinjaBinaryFile njBin = new SAModel.NinjaBinaryFile(File, ModelFormat.Chunk);
 
 

@@ -98,7 +98,7 @@ namespace ArchiveTool
 							if (args[i] == "-nodup") { nodup = true; outputPath += "_nodup"; }
 							if (args[i] == "-grnd") { grnd_decode = true; }
 							if (args[i] == "-tex") { separate_textures = true; }
-							if (args[i] == "-dc") { output_as_little = true; }
+							if (args[i] == "-le") { output_as_little = true; }
 						}
 					}
 					if (!Directory.Exists(outputPath)) Directory.CreateDirectory(outputPath);
