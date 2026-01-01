@@ -1561,7 +1561,7 @@ namespace ArchiveLib
 			byte[] POF0_block = new byte[pofsize];
 			Array.Copy(file, address + njmsize + 8, POF0_block, 0, pofsize);
 
-			int last_offset_idx = pofsize;
+			int last_offset_idx = pofsize - 1;
 			while (POF0_block[last_offset_idx] == 0x00)
 			{
 				last_offset_idx--;
