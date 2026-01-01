@@ -2038,34 +2038,27 @@ namespace ArchiveLib
 		private void GetNmldPieces(byte[] file, bool output_as_little)
 		{
 			string base_name = Name;
-			int count = 0;
 
-			List<int> all_offsets = new List<int> { };
-			all_offsets.AddRange(ObjectAddresses);
-			all_offsets.AddRange(MotionAddresses);
-			all_offsets.AddRange(GroundAddresses);
-			all_offsets.Sort();
-			foreach (int offset in all_offsets)
+			int count = 1;
+			foreach (int offset in ObjectAddresses)
 			{
 				if (offset == 0) continue;
-				if (ObjectAddresses.Contains(offset))
-				{
-					string filename = base_name + "_NJ_" + count.ToString("D3");
-					Objects.Add(offset, new nmldObject(file, offset, filename, output_as_little));
-					count++;
-				} else if (MotionAddresses.Contains(offset))
-				{
-					Motions.Add(offset, new nmldMotion(file, offset, base_name, count.ToString("D3"), output_as_little));
-					count++;
-				} else if (GroundAddresses.Contains(offset))
-				{
-					string filename = base_name + "_" + count.ToString("D3");
-					Grounds.Add(offset, new nmldGround(file, offset, filename, GrndDecode));
-					count++;
-				} else
-				{
-					Console.WriteLine("No file found at offset: " + offset.ToString());
-				}
+				string filename = base_name + "_NJ_" + count.ToString("D3");
+				Objects.Add(offset, new nmldObject(file, offset, filename, output_as_little));
+				count++;
+			}
+			foreach (int offset in MotionAddresses)
+			{
+				if (offset == 0) continue;
+				Motions.Add(offset, new nmldMotion(file, offset, base_name, count.ToString("D3"), output_as_little));
+				count++;
+			}
+			foreach (int offset in GroundAddresses)
+			{
+				if (offset == 0) continue;
+				string filename = base_name + "_" + count.ToString("D3");
+				Grounds.Add(offset, new nmldGround(file, offset, filename, GrndDecode));
+				count++;
 			}
 		}
 
