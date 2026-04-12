@@ -35,7 +35,7 @@ namespace ArchiveLib
 			if (!string.IsNullOrWhiteSpace(dir))
 				Directory.CreateDirectory(dir);
 
-			File.WriteAllText(_logPath, $"[{DateTime.UtcNow:O}] SkiesOfArcadia NJCM parse log started.{Environment.NewLine}");
+			File.WriteAllText(_logPath, $"SkiesOfArcadia NJCM parse log started.{Environment.NewLine}");
 			_initialized = true;
 		}
 
@@ -44,7 +44,7 @@ namespace ArchiveLib
 			lock (Sync)
 			{
 				EnsureInitialized();
-				File.AppendAllText(_logPath, $"[{DateTime.UtcNow:O}] {message}{Environment.NewLine}");
+				File.AppendAllText(_logPath, $"{message}{Environment.NewLine}");
 			}
 		}
 	}
