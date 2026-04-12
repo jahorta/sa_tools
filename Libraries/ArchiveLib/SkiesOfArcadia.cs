@@ -144,11 +144,9 @@ namespace ArchiveLib
 
 		private static void LogNjcmChunkStats(SAModel.NinjaBinaryFile njBin)
 		{
-			for (int chunkIndex = 0; chunkIndex < njBin.ChunkDebugInfo.Count; chunkIndex++)
-			{
-				SAModel.NinjaBinaryFile.NinjaChunkDebugInfo chunk = njBin.ChunkDebugInfo[chunkIndex];
-				MldNjcmLog.Write($"[NJCM Chunk {chunkIndex}] type={chunk.ChunkType}, start=0x{chunk.StartOffset:X8}, size=0x{chunk.Size:X8}, imageBase=0x{chunk.ImageBase:X8}, pof0Fixup={chunk.UsedPof0Fixup}");
-			}
+			List<SAModel.NinjaBinaryFile.NinjaChunkDebugInfo> modelChunks = njBin.ChunkDebugInfo
+				.Where(a => a.ChunkType == "ChunkModel" || a.ChunkType == "BasicModel")
+				.ToList();
 
 			for (int modelIndex = 0; modelIndex < njBin.Models.Count; modelIndex++)
 			{
@@ -163,20 +161,24 @@ namespace ArchiveLib
 				int semanticTriangleTotal = 0;
 				int semanticIndexTotal = 0;
 				int outOfRangeSemanticIndexTotal = 0;
-				Dictionary<ChunkType, int> vertexChunkHistogram = new();
-				Dictionary<ChunkType, int> polyChunkHistogram = new();
+				int vertexChunkCount = 0;
+				int polyChunkCount = 0;
+				Dictionary<int, int> vertexChunkHistogram = new();
+				Dictionary<int, int> polyChunkHistogram = new();
 
 				foreach (ChunkAttach attach in attaches)
 				{
 					HashSet<int> validIndices = new HashSet<int>();
 					if (attach.Vertex != null)
 					{
-						foreach (VertexChunk chunk in attach.Vertex)
-						{
-							semanticVertexTotal += chunk.VertexCount;
-							if (!vertexChunkHistogram.ContainsKey(chunk.Type))
-								vertexChunkHistogram[chunk.Type] = 0;
-							vertexChunkHistogram[chunk.Type]++;
+							foreach (VertexChunk chunk in attach.Vertex)
+							{
+								semanticVertexTotal += chunk.VertexCount;
+								vertexChunkCount++;
+								int chunkType = (int)chunk.Type;
+								if (!vertexChunkHistogram.ContainsKey(chunkType))
+									vertexChunkHistogram[chunkType] = 0;
+								vertexChunkHistogram[chunkType]++;
 
 							for (int i = 0; i < chunk.VertexCount; i++)
 								validIndices.Add(chunk.IndexOffset + i);
@@ -187,9 +189,11 @@ namespace ArchiveLib
 					{
 						foreach (PolyChunk polyChunk in attach.Poly)
 						{
-							if (!polyChunkHistogram.ContainsKey(polyChunk.Type))
-								polyChunkHistogram[polyChunk.Type] = 0;
-							polyChunkHistogram[polyChunk.Type]++;
+							polyChunkCount++;
+							int chunkType = (int)polyChunk.Type;
+							if (!polyChunkHistogram.ContainsKey(chunkType))
+								polyChunkHistogram[chunkType] = 0;
+							polyChunkHistogram[chunkType]++;
 
 							switch (polyChunk)
 							{
@@ -234,17 +238,29 @@ namespace ArchiveLib
 					}
 				}
 
-				string vertexHistogram = string.Join(", ", vertexChunkHistogram.OrderBy(a => a.Key).Select(a => $"{a.Key}:{a.Value}"));
-				if (vertexHistogram.Length == 0) vertexHistogram = "<none>";
-				string polyHistogram = string.Join(", ", polyChunkHistogram.OrderBy(a => a.Key).Select(a => $"{a.Key}:{a.Value}"));
-				if (polyHistogram.Length == 0) polyHistogram = "<none>";
+				SAModel.NinjaBinaryFile.NinjaChunkDebugInfo? chunkInfo = modelIndex < modelChunks.Count ? modelChunks[modelIndex] : null;
+				int chunkOffset = chunkInfo?.StartOffset ?? -1;
+				int chunkDataSize = chunkInfo?.Size ?? -1;
+				int imageBase = chunkInfo?.ImageBase ?? 0;
+				bool usedPof0Fixup = chunkInfo?.UsedPof0Fixup ?? false;
 
-				MldNjcmLog.Write($"[NJCM Model {modelIndex}] objectCount={objects.Count}, attachCount={attaches.Count}");
-				MldNjcmLog.Write($"[NJCM Model {modelIndex}] semanticTotals vertices={semanticVertexTotal}, triangles={semanticTriangleTotal}, indices={semanticIndexTotal}");
-				MldNjcmLog.Write($"[NJCM Model {modelIndex}] outOfRangeSemanticIndices={outOfRangeSemanticIndexTotal}");
-				MldNjcmLog.Write($"[NJCM Model {modelIndex}] vertexChunkHistogram={vertexHistogram}");
-				MldNjcmLog.Write($"[NJCM Model {modelIndex}] polyChunkHistogram={polyHistogram}");
+				MldNjcmLog.Write(
+					$"[NJCM] offset={chunkOffset} size={chunkDataSize} modelIndex={modelIndex} " +
+					$"imgBase={imageBase} pof0Fixup={(usedPof0Fixup ? "yes" : "no")} " +
+					$"objs={objects.Count} attaches={attaches.Count} " +
+					$"verts={semanticVertexTotal} tris={semanticTriangleTotal} " +
+					$"vchunks={vertexChunkCount} pchunks={polyChunkCount} " +
+					$"indices={semanticIndexTotal} oob={outOfRangeSemanticIndexTotal} " +
+					$"vtypes={FormatHistogram(vertexChunkHistogram)} ptypes={FormatHistogram(polyChunkHistogram)}");
 			}
+		}
+
+		private static string FormatHistogram(Dictionary<int, int> histogram)
+		{
+			if (histogram.Count == 0)
+				return "{}";
+
+			return "{" + string.Join(", ", histogram.OrderBy(a => a.Key).Select(a => $"{a.Key}:{a.Value}")) + "}";
 		}
 
 		public nmldObject(byte[] file, string name)
