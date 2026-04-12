@@ -29,10 +29,7 @@ namespace ArchiveLib
 			if (_initialized)
 				return;
 
-			string envPath = Environment.GetEnvironmentVariable("SA_TOOLS_MLD_NJCM_LOG_PATH");
-			_logPath = string.IsNullOrWhiteSpace(envPath)
-				? Path.Combine(Environment.CurrentDirectory, "mld_njcm_parse.log")
-				: envPath;
+			_logPath = "C:\\Users\\jahor\\source\\repos\\jahorta\\SOASim\\SoaSimFileParsing\\parsed\\sa_tool_njcm_parse_log.txt";
 
 			string? dir = Path.GetDirectoryName(_logPath);
 			if (!string.IsNullOrWhiteSpace(dir))
