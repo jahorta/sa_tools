@@ -7,6 +7,15 @@ namespace SAModel
 {
 	public class NinjaBinaryFile
 	{
+		public sealed class NinjaChunkDebugInfo
+		{
+			public string ChunkType { get; init; } = string.Empty;
+			public int StartOffset { get; init; }
+			public int Size { get; init; }
+			public int ImageBase { get; init; }
+			public bool UsedPof0Fixup { get; init; }
+		}
+
 		private enum NinjaBinaryChunkType
 		{
 			BasicModel,
@@ -22,11 +31,14 @@ namespace SAModel
 		public readonly List<NJS_OBJECT> Models; // In NJBM or NJCM
 		public readonly List<NJS_MOTION> Motions; // In NMDM
 		public readonly List<string[]> Texnames; // In NJTL
+		public readonly List<NinjaChunkDebugInfo> ChunkDebugInfo;
 
 		private class NinjaDataChunk(NinjaBinaryChunkType type, byte[] data)
 		{
 			public readonly NinjaBinaryChunkType Type = type;
 			public int ImageBase;
+			public int StartOffset;
+			public bool UsedPof0Fixup;
 			public readonly byte[] Data = data;
 		}
 
@@ -71,6 +83,7 @@ namespace SAModel
 			Models = [];
 			Motions = [];
 			Texnames = [];
+			ChunkDebugInfo = [];
 			
 			var startOffset = 0; // Current reading position.
 			var modelCount = 0; // This is used to keep track of the model added last to get data for motions.
@@ -149,6 +162,7 @@ namespace SAModel
 				var size = sizeIsLittleEndian ? BitConverter.ToInt32(data, startOffset + 4) : ByteConverter.ToInt32(data, startOffset + 4);
 				// Add the chunk to the list to process
 				chunks.Add(new NinjaDataChunk(idType, new byte[size]));
+				chunks[currentChunk].StartOffset = startOffset;
 				Array.Copy(data, startOffset + 8, chunks[currentChunk].Data, 0, chunks[currentChunk].Data.Length);
 				
 				if (idType == NinjaBinaryChunkType.POF0)
@@ -157,6 +171,7 @@ namespace SAModel
 					var offs = POF0Helper.GetPointerListFromPOF(chunks[currentChunk].Data);
 					POF0Helper.FixPointersWithPOF(chunks[currentChunk - 1].Data, offs, imgBase);
 					chunks[currentChunk - 1].ImageBase = imgBase;
+					chunks[currentChunk - 1].UsedPof0Fixup = true;
 				}
 				else
 				{
@@ -171,6 +186,15 @@ namespace SAModel
 			// Go over the fixed chunks and add final data
 			foreach (var chunk in chunks)
 			{
+				ChunkDebugInfo.Add(new NinjaChunkDebugInfo
+				{
+					ChunkType = chunk.Type.ToString(),
+					StartOffset = chunk.StartOffset,
+					Size = chunk.Data.Length,
+					ImageBase = chunk.ImageBase,
+					UsedPof0Fixup = chunk.UsedPof0Fixup
+				});
+
 				switch (chunk.Type)
 				{
 					case NinjaBinaryChunkType.BasicModel:

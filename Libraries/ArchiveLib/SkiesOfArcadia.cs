@@ -18,6 +18,40 @@ using IniGroup = System.Collections.Generic.Dictionary<string, string>;
 // Skies of Arcadia MLD archives.
 namespace ArchiveLib
 {
+	internal static class MldNjcmLog
+	{
+		private static readonly object Sync = new object();
+		private static bool _initialized = false;
+		private static string _logPath = string.Empty;
+
+		private static void EnsureInitialized()
+		{
+			if (_initialized)
+				return;
+
+			string envPath = Environment.GetEnvironmentVariable("SA_TOOLS_MLD_NJCM_LOG_PATH");
+			_logPath = string.IsNullOrWhiteSpace(envPath)
+				? Path.Combine(Environment.CurrentDirectory, "mld_njcm_parse.log")
+				: envPath;
+
+			string? dir = Path.GetDirectoryName(_logPath);
+			if (!string.IsNullOrWhiteSpace(dir))
+				Directory.CreateDirectory(dir);
+
+			File.WriteAllText(_logPath, $"[{DateTime.UtcNow:O}] SkiesOfArcadia NJCM parse log started.{Environment.NewLine}");
+			_initialized = true;
+		}
+
+		public static void Write(string message)
+		{
+			lock (Sync)
+			{
+				EnsureInitialized();
+				File.AppendAllText(_logPath, $"[{DateTime.UtcNow:O}] {message}{Environment.NewLine}");
+			}
+		}
+	}
+
 	public class nmldObject
 	{
 		public string Name;
@@ -27,10 +61,13 @@ namespace ArchiveLib
 
 		public nmldObject(byte[] file, int offset, string name, bool output_as_little)
 		{
+			MldNjcmLog.Write($"[nmldObject] Begin parse name={name}, tableOffset=0x{offset:X8}, outputAsLittle={output_as_little}");
+
 			int ptrNJCM = ByteConverter.ToInt32(file, offset);
 			uint chunksize = ByteConverter.ToUInt32(file, offset + 4) - 16;
 			int ptrNJTL = ByteConverter.ToInt32(file, offset + 8);
 			uint unknown = ByteConverter.ToUInt32(file, offset + 12);
+			MldNjcmLog.Write($"[nmldObject] Header ptrNJCM=0x{ptrNJCM:X8}, ptrNJTL=0x{ptrNJTL:X8}, chunkSize=0x{chunksize:X8} ({chunksize}), unknown=0x{unknown:X8}");
 
 			if (unknown != 0)
 				Console.WriteLine("Unknown Pointer in Object is populated: {0}", unknown.ToString());
@@ -40,6 +77,7 @@ namespace ArchiveLib
 			if (start == 0)
 			{
 				Console.WriteLine("Object(s) have no data pointers.");
+				MldNjcmLog.Write("[nmldObject] No NJCM/NJTL pointer found, skipping object.");
 				return;
 			}
 
@@ -47,13 +85,20 @@ namespace ArchiveLib
 
 			File = new byte[chunksize];
 			Array.Copy(file, start + offset, File, 0, chunksize);
-
-			if (!output_as_little)
-				return;
-
-			Name += "_le";
+			string magic = File.Length >= 4 ? Encoding.ASCII.GetString(File, 0, 4) : "<none>";
+			MldNjcmLog.Write($"[nmldObject] Data start=0x{(start + offset):X8}, copiedBytes=0x{chunksize:X8}, firstMagic={magic}");
 
 			SAModel.NinjaBinaryFile njBin = new SAModel.NinjaBinaryFile(File, ModelFormat.Chunk);
+			MldNjcmLog.Write($"[nmldObject] NinjaBinary parsed texLists={njBin.Texnames.Count}, modelCount={njBin.Models.Count}");
+			LogNjcmChunkStats(njBin);
+
+			if (!output_as_little)
+			{
+				MldNjcmLog.Write($"[nmldObject] Complete name={Name}, littleEndianOutput=disabled");
+				return;
+			}
+
+			Name += "_le";
 
 
 			bool isBig = ByteConverter.BigEndian;
@@ -70,14 +115,12 @@ namespace ArchiveLib
 			byte[] njs_obj = njBin.Models[0].NJGetBytes((UInt32)file_out.Count, false, labels, njOffsets, out uint addr);
 
 			List<byte> l_njs_obj = [.. njs_obj];
-			List<uint> offset_values = new List<uint>();
 			njOffsets.Sort();
 			uint file_offset = (uint)file_out.Count();
 			List<uint> POF0_offset_list = new List<uint>();
 			for (int i = 0; i < njOffsets.Count(); i++)
 			{
 				int i_offset = ByteConverter.ToInt32(njs_obj, (int)(njOffsets[i] - file_offset));
-				offset_values.Add((uint)i_offset);
 				if (i_offset != 0)
 				{
 					l_njs_obj.SetByteListInt((int)(njOffsets[i] - file_offset), (int)(i_offset - file_offset));
@@ -100,6 +143,111 @@ namespace ArchiveLib
 			FileLittleEndian = file_out.ToArray();
 
 			ByteConverter.BigEndian = isBig;
+		}
+
+		private static void LogNjcmChunkStats(SAModel.NinjaBinaryFile njBin)
+		{
+			for (int chunkIndex = 0; chunkIndex < njBin.ChunkDebugInfo.Count; chunkIndex++)
+			{
+				SAModel.NinjaBinaryFile.NinjaChunkDebugInfo chunk = njBin.ChunkDebugInfo[chunkIndex];
+				MldNjcmLog.Write($"[NJCM Chunk {chunkIndex}] type={chunk.ChunkType}, start=0x{chunk.StartOffset:X8}, size=0x{chunk.Size:X8}, imageBase=0x{chunk.ImageBase:X8}, pof0Fixup={chunk.UsedPof0Fixup}");
+			}
+
+			for (int modelIndex = 0; modelIndex < njBin.Models.Count; modelIndex++)
+			{
+				NJS_OBJECT root = njBin.Models[modelIndex];
+				List<NJS_OBJECT> objects = root.GetObjects().ToList();
+				List<ChunkAttach> attaches = objects
+					.Where(a => a.Attach is ChunkAttach)
+					.Select(a => (ChunkAttach)a.Attach)
+					.ToList();
+
+				int semanticVertexTotal = 0;
+				int semanticTriangleTotal = 0;
+				int semanticIndexTotal = 0;
+				int outOfRangeSemanticIndexTotal = 0;
+				Dictionary<ChunkType, int> vertexChunkHistogram = new();
+				Dictionary<ChunkType, int> polyChunkHistogram = new();
+
+				foreach (ChunkAttach attach in attaches)
+				{
+					HashSet<int> validIndices = new HashSet<int>();
+					if (attach.Vertex != null)
+					{
+						foreach (VertexChunk chunk in attach.Vertex)
+						{
+							semanticVertexTotal += chunk.VertexCount;
+							if (!vertexChunkHistogram.ContainsKey(chunk.Type))
+								vertexChunkHistogram[chunk.Type] = 0;
+							vertexChunkHistogram[chunk.Type]++;
+
+							for (int i = 0; i < chunk.VertexCount; i++)
+								validIndices.Add(chunk.IndexOffset + i);
+						}
+					}
+
+					if (attach.Poly != null)
+					{
+						foreach (PolyChunk polyChunk in attach.Poly)
+						{
+							if (!polyChunkHistogram.ContainsKey(polyChunk.Type))
+								polyChunkHistogram[polyChunk.Type] = 0;
+							polyChunkHistogram[polyChunk.Type]++;
+
+							switch (polyChunk)
+							{
+								case PolyChunkStrip stripChunk:
+									foreach (PolyChunkStrip.Strip strip in stripChunk.Strips)
+									{
+										semanticIndexTotal += strip.Indexes.Length;
+										semanticTriangleTotal += Math.Max(strip.Indexes.Length - 2, 0);
+										foreach (ushort index in strip.Indexes)
+										{
+											if (!validIndices.Contains(index))
+												outOfRangeSemanticIndexTotal++;
+										}
+									}
+									break;
+								case PolyChunkVolume volumeChunk:
+									foreach (PolyChunkVolume.Poly poly in volumeChunk.Polys)
+									{
+										semanticIndexTotal += poly.Indexes.Length;
+										foreach (ushort index in poly.Indexes)
+										{
+											if (!validIndices.Contains(index))
+												outOfRangeSemanticIndexTotal++;
+										}
+									}
+									switch (volumeChunk.Type)
+									{
+										case ChunkType.Volume_Polygon3:
+											semanticTriangleTotal += volumeChunk.Polys.Count;
+											break;
+										case ChunkType.Volume_Polygon4:
+											semanticTriangleTotal += volumeChunk.Polys.Count * 2;
+											break;
+										case ChunkType.Volume_Strip:
+											foreach (PolyChunkVolume.Strip strip in volumeChunk.Polys.OfType<PolyChunkVolume.Strip>())
+												semanticTriangleTotal += Math.Max(strip.Indexes.Length - 2, 0);
+											break;
+									}
+									break;
+							}
+						}
+					}
+				}
+
+				string vertexHistogram = string.Join(", ", vertexChunkHistogram.OrderBy(a => a.Key).Select(a => $"{a.Key}:{a.Value}"));
+				if (vertexHistogram.Length == 0) vertexHistogram = "<none>";
+				string polyHistogram = string.Join(", ", polyChunkHistogram.OrderBy(a => a.Key).Select(a => $"{a.Key}:{a.Value}"));
+				if (polyHistogram.Length == 0) polyHistogram = "<none>";
+
+				MldNjcmLog.Write($"[NJCM Model {modelIndex}] objectCount={objects.Count}, attachCount={attaches.Count}");
+				MldNjcmLog.Write($"[NJCM Model {modelIndex}] semanticTotals vertices={semanticVertexTotal}, triangles={semanticTriangleTotal}, indices={semanticIndexTotal}");
+				MldNjcmLog.Write($"[NJCM Model {modelIndex}] outOfRangeSemanticIndices={outOfRangeSemanticIndexTotal}");
+				MldNjcmLog.Write($"[NJCM Model {modelIndex}] vertexChunkHistogram={vertexHistogram}");
+				MldNjcmLog.Write($"[NJCM Model {modelIndex}] polyChunkHistogram={polyHistogram}");
+			}
 		}
 
 		public nmldObject(byte[] file, string name)
@@ -2004,9 +2152,11 @@ namespace ArchiveLib
 
 		private void GetEntries(byte[] file, int offset, int count)
 		{
+			MldNjcmLog.Write($"[GetEntries] Reading {count} entries from offset=0x{offset:X8}");
 			for (int i = 0; i < count; i++)
 			{
 				nmldEntry entry = new nmldEntry(offset + (i * 104), file);
+				MldNjcmLog.Write($"[GetEntries] Entry[{i}] objectAddrs={entry.ObjectAddresses.Count}, motionAddrs={entry.MotionAddresses.Count}, groundAddrs={entry.GroundAddresses.Count}");
 				if (entry.ObjectAddresses.Count > 0)
 				{
 					foreach (int addr in entry.ObjectAddresses)
@@ -2040,10 +2190,12 @@ namespace ArchiveLib
 			string base_name = Name;
 
 			int count = 1;
+			MldNjcmLog.Write($"[GetNmldPieces] Start objects={ObjectAddresses.Count}, motions={MotionAddresses.Count}, grounds={GroundAddresses.Count}");
 			foreach (int offset in ObjectAddresses)
 			{
 				if (offset == 0) continue;
 				string filename = base_name + "_NJ_" + count.ToString("D3");
+				MldNjcmLog.Write($"[GetNmldPieces] Parsing object offset=0x{offset:X8}, name={filename}");
 				Objects.Add(offset, new nmldObject(file, offset, filename, output_as_little));
 				count++;
 			}
@@ -2104,12 +2256,14 @@ namespace ArchiveLib
 		{
 			Name = name;
 			GrndDecode = grnd_decode;
+			MldNjcmLog.Write($"[nmldArchiveFile] Begin name={Name}, bytes={file.Length}, grndDecode={grnd_decode}, outputAsLittle={output_as_little}");
 
 			int nmldCount		= ByteConverter.ToInt32(file, 0);
 			int ptr_nmldTable	= ByteConverter.ToInt32(file, 0x04);
 			int ptr_fxnparams	= ByteConverter.ToInt32(file, 0x08);
 			int realdatapointer = ByteConverter.ToInt32(file, 0x0C);
 			int textablepointer = ByteConverter.ToInt32(file, 0x10);
+			MldNjcmLog.Write($"[nmldArchiveFile] Header count={nmldCount}, ptrNmldTable=0x{ptr_nmldTable:X8}, ptrFxnParams=0x{ptr_fxnparams:X8}, realData=0x{realdatapointer:X8}, texTable=0x{textablepointer:X8}");
 			Console.WriteLine("Number of NMLD entries: {0}, NMLD data starts at {1}, real data starts at {2}", nmldCount, ptr_nmldTable.ToString("X"), realdatapointer.ToString("X"));
 
 			if (ptr_nmldTable > 0x14)
